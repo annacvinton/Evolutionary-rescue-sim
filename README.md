@@ -1,11 +1,11 @@
-############################################################################### TITLE & SUMMARY
-################################## TITLE
-Evolutionary Rescue in Complex Landscapes
+# Evolutionary Rescue in Complex Landscapes
 
-################################## SUMMARY
+## SUMMARY
+
+???
 
 
-################################## RESEARCH QUESTIONS
+## RESEARCH QUESTIONS
 1. Resistance to perturbation
 -> "What makes populations resistant to perturbations?"
 
@@ -19,8 +19,8 @@ Evolutionary Rescue in Complex Landscapes
 4. Lightning in a bottle / Non-linear effects on survival
 -> "Are there combinations of biological or spatial parameters which allow survival of especially large perturbations?"
 
-############################################################################### PRIMARY CONTACT & COLLABORATORS
-################################## PRIMARY CONTACT
+# PRIMARY CONTACT & COLLABORATORS
+## PRIMARY CONTACT
 Anna C Vinton, PhD
 NSF Postdoctoral Fellow in Biology
 Department of Zoology, Oxford University
@@ -28,17 +28,17 @@ She/her
 Website: AnnaVinton.com
 Twitter: @TheoreticalAnna
 
-################################## COLLABORATORS, order is alphabetic and does not represent final publication order
+## COLLABORATORS, order is alphabetic and does not represent final publication order
 - David Vasseur, david.vasseur@yale.edu
 - Erik Kusch, erik.kusch@bio.au.dk
 - Ulf Dieckmann, dieckmann@iiasa.ac.at
 - Åke Brännström, , ake.brannstrom@umu.se
 
-############################################################################### DATA
-################################## REPOSITORY
+# DATA
+## REPOSITORY
 Currently residing on a MEGA.nz drive shared between Anna Vinton and Erik Kusch
 
-################################## DATA SETS
+## DATA SETS
 Filenames describe simulation runs - made up of (and separated by "_"):
 - AC ... the number following this indicates autocorrelation in the landscape (0-4)
 - DI ... the number following this indicates dispersal kernel (1.5, 2)
@@ -46,7 +46,7 @@ Filenames describe simulation runs - made up of (and separated by "_"):
 - SL ... the number following this indicates slope in the landscape (.8, 1, 1.2)
 - VA ... the number following this indicates variance in the landscape (25, 50, 100)
 
-################################## VARIABLES
+## VARIABLES
 - pert.value .... perturbation magnitude at time t [numeric]
 - pert.name ..... perturbation maximum for simulation run (remains constant over time) [numeric]
 - rep ........... replicate for treatment [numeric]
@@ -58,8 +58,8 @@ Filenames describe simulation runs - made up of (and separated by "_"):
 - id ............ identifier for individuals (remains constant over time) [numeric]
 - patch ......... patchiness of environment (remains constant over time, but not in space) [numeric]
 
-############################################################################### PREVIOUS WORK
+# PREVIOUS WORK
 Anna Vinton's PhD thesis (link to that available?)
 
-############################################################################### FUNDING
+# FUNDING
 ???
