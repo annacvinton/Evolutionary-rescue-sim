@@ -124,5 +124,23 @@ pblapply(Sims_fs,
   unlink(file.path(Dir.Data, x))
   })
 
+## Shifted rows -----------------------------------------------------------
+Sims_fs <- list.files(Dir.Data, ".rds")
+
+pblapply(Sims_fs, 
+         cl = cl,
+         function(x){
+           # x <- Sims_fs[1]
+           # message(x)
+           
+           data_df <- readRDS(file = file.path(Dir.Data, x))
+           RowPertTooBig <- which(data_df$pert.name > 16)
+           RowPertNA <- which(is.na(data_df$patch))
+           if(length(RowPertTooBig) > 0 | length(RowPertNA) > 0){
+             data_df <- data_df[-c(RowPertTooBig, RowPertNA),]
+             saveRDS(data_df, file = file.path(Dir.Data, x))
+           }
+         })
+
 parallel::stopCluster(cl)
 closeAllConnections()
