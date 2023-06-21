@@ -30,7 +30,7 @@ Twitter: @TheoreticalAnna
 
 ## COLLABORATORS, order is alphabetic and does not represent final publication order
 - David Vasseur, david.vasseur@yale.edu
-- Erik Kusch, erik.kusch@bio.au.dk
+- Erik Kusch, erik.kusch@nhm-uio.no
 - Ulf Dieckmann, dieckmann@iiasa.ac.at
 - Åke Brännström, , ake.brannstrom@umu.se
 
