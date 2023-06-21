@@ -40,3 +40,10 @@ vignettes/*.pdf
 
 # ignore data folder
 Data/*
+DISCARD/*
+Logo/*
+Exports/*
+Icon*
+
+*.Rproj
+*.DS_Store

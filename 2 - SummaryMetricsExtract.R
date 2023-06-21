@@ -3,7 +3,7 @@
 #' CONTENTS: 
 #'  - Data Extraction
 #'  DEPENDENCIES:
-#'  - DataCleaning.R must have been run
+#'  - 1 - DataCleaning.R must have been run
 #' AUTHOR: [Erik Kusch]
 #' ####################################################################### #
 
@@ -51,6 +51,15 @@ clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.pack
 
 ## Loading & Extraction ---------------------------------------------------
 Sims_fs <- list.files(Dir.Data, ".rds")
+
+"AC_20_0_1.5_0_1_25"
+
+
+testfile <- paste("AC0", "DI1.5", "MU0", "SL1", "VA25", sep="_")
+x <- paste0(testfile, ".rds")
+
+10
+20
 
 Data_ls <- pblapply(Sims_fs, 
                     cl = cl,

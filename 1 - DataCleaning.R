@@ -38,6 +38,13 @@ sapply(package_vec, install.load.package)
 ## Functionality ----------------------------------------------------------
 `%nin%` <- Negate(`%in%`) # a function for negation of %in% function
 
+cl <- parallel::makeCluster(parallel::detectCores())
+parallel::clusterExport(cl,
+                        varlist = c("Dir.Data", "install.load.package", "package_vec"),
+                        envir = environment()
+)
+clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
+
 # DATA ====================================================================
 
 ## Part 2 files -----------------------------------------------------------
@@ -61,13 +68,6 @@ if(length(part2_fs)>0){
 }
 
 ## Duplicate Replicates ---------------------------------------------------
-cl <- parallel::makeCluster(parallel::detectCores())
-parallel::clusterExport(cl,
-                        varlist = c("Dir.Data", "install.load.package", "package_vec"),
-                        envir = environment()
-)
-clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
-
 Sims_fs <- list.files(Dir.Data, ".txt")
 
 pblapply(Sims_fs, 
@@ -140,6 +140,45 @@ pblapply(Sims_fs,
              data_df <- data_df[-c(RowPertTooBig, RowPertNA),]
              saveRDS(data_df, file = file.path(Dir.Data, x))
            }
+         })
+
+
+## Runs which ended too soon ----------------------------------------------
+Sims_fs <- list.files(Dir.Data, ".rds")
+
+pblapply(Sims_fs, 
+         cl = cl,
+         function(x){
+           # x <- Sims_fs[1]
+           # message(x)
+           data_df <- readRDS(file = file.path(Dir.Data, x))
+           ts <- aggregate(t ~ pert.value + pert.name + rep, data = data_df, FUN = max)
+           remove <- ts[which(ts$t < 450),]
+           if(nrow(remove) > 0){
+             for(k in nrow(remove)){
+               data_df <- data_df[
+                 -which(
+                   data_df$pert.value == remove$pert.value[k] & 
+                     data_df$pert.name == remove$pert.name[k] &
+                     data_df$rep == remove$rep[k]
+                 ), ] 
+             }
+             saveRDS(data_df, file = file.path(Dir.Data, x))
+           }
+         })
+
+
+## Individuals exactly at 0.5000 ------------------------------------------
+Sims_fs <- list.files(Dir.Data, ".rds")
+
+pblapply(Sims_fs, 
+         cl = cl,
+         function(x){
+           # x <- Sims_fs[1]
+           # message(x)
+           data_df <- readRDS(file = file.path(Dir.Data, x))
+           data2_df <- data_df[!(endsWith(as.character(round(data_df$y, 5)), ".5") | endsWith(as.character(round(data_df$x, 5)), ".5")), ]
+           saveRDS(data_df, file = file.path(Dir.Data, x))
          })
 
 parallel::stopCluster(cl)
