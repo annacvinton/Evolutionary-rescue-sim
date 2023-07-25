@@ -160,8 +160,8 @@ n_plot <- ggplot(data.frame(x = 1:10), aes(x = x, y = x/2)) +
   annotate("text", x = 0, y = 5, label = paste("Total number of executed simulations =", n_totalruns), hjust = 0) + 
   annotate("text", x = 0, y = 4, label = paste("Number of executed simulations ending in extinction =", n_extinctruns), hjust = 0) + 
   annotate("text", x = 0, y = 3, label = paste("Number of executed simulations for which evolutionary resuce metrics can be computed =", n_potevoresruns), hjust = 0) + 
-  annotate("text", x = 0, y = 2, label = paste("Number of executed simulations whose populations crash hard enough =", n_extinctruns), hjust = 0) + 
-  annotate("text", x = 0, y = 1, label = paste("Number of executed simulations who crash hard enough and rebound sufficiently =", n_extinctruns), hjust = 0) + 
+  annotate("text", x = 0, y = 2, label = paste("Number of executed simulations whose populations crash hard enough =", n_dipruns), hjust = 0) + 
+  annotate("text", x = 0, y = 1, label = paste("Number of executed simulations who crash hard enough and rebound sufficiently =", n_rebruns), hjust = 0) + 
   theme_void()
 
 plot_save <- plot_grid(PotEvoRes1_gg, PotEvoRes2_gg)
