@@ -406,7 +406,7 @@ Overlap_ls <- lapply(X = names(EnvirDist_ls),
                          # Perturbations_ls = lapply(lapply(Pert_ls, "[", -1), "[[", 1)
                          # )
                          # names(Up_ls) <- c("Summary_df", z)
-                         save(Up_ls, file = file.path(Dir.Exports, paste0("TEMP_", Iter_fs, "_",  z, ".RData")))
+                         # save(Up_ls, file = file.path(Dir.Exports, paste0("TEMP_", Iter_fs, "_",  z, ".RData")))
                          Up_ls
                        })
                        Up_ls <- do.call(rbind, Iter_ls)
