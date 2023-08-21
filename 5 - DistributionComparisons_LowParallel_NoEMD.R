@@ -34,8 +34,9 @@ package_vec <- c(
   "lattice",
   "DescTools",
   "sp",
-  "raster",
-  "emdist"
+  "raster"
+  # ,
+  # "emdist"
 )
 sapply(package_vec, install.load.package)
 
@@ -252,8 +253,8 @@ Overlap_ls <- lapply(X = names(EnvirDist_ls),
                                                                                       Post = Enviro_ras+z)
                                                                     
                                                                     #### Comparison Loop ----
-                                                                    if(file.exists(file.path(Dir.Exports, paste0("TEMP_", y, "_",  z, "_", b, ".RData")))){
-                                                                      load(file.path(Dir.Exports, paste0("TEMP_", y, "_",  z, "_", b, ".RData")))
+                                                                    if(file.exists(file.path(Dir.Exports, paste0("TEMP_", y, "_",  z, "_", b, "_NoEMD.RData")))){
+                                                                      load(file.path(Dir.Exports, paste0("TEMP_", y, "_",  z, "_", b, "_NoEMD.RData")))
                                                                     }else{
                                                                       nC <- nrow(comparison)
                                                                       cl <- makeCluster(nC)
@@ -281,7 +282,7 @@ Overlap_ls <- lapply(X = names(EnvirDist_ls),
                                                                                               Ras_abs <- NULL
                                                                                               Best_df <- NULL
                                                                                               Closest_df <- NULL
-                                                                                              EMD2D <- NULL
+                                                                                              # EMD2D <- NULL
                                                                                             }else{
                                                                                               coordinates(Indivs_sp) <- ~x+y
                                                                                               Indivs_ras <- rasterize(x = Indivs_sp[,"u"], y = Enviro_ras, fun = mean)$u
@@ -298,9 +299,9 @@ Overlap_ls <- lapply(X = names(EnvirDist_ls),
                                                                                               Ras_abs <- abs(Indivs_ras-Enviro_iter)
                                                                                               # plot(Ras_abs, colNA = "grey")
                                                                                               
-                                                                                              # EMD
-                                                                                              set.seed(42)
-                                                                                              EMD2D <- emd2d(matrix(Indivs_ras, ncol = 100), matrix(Enviro_iter, ncol = 100), max.iter = 1e3)
+                                                                                              # # EMD
+                                                                                              # set.seed(42)
+                                                                                              # EMD2D <- emd2d(matrix(Indivs_ras, ncol = 100), matrix(Enviro_iter, ncol = 100), max.iter = 1e3)
                                                                                               
                                                                                               # Best-suited environment
                                                                                               Best_df <- apply(Pop_df, MARGIN = 1, FUN = function(p){
@@ -367,7 +368,7 @@ Overlap_ls <- lapply(X = names(EnvirDist_ls),
                                                                                                 Closest_dist_sd = sd(Closest_df$Closest_dists),
                                                                                                 Closest_diff_med = median(Closest_df$Closest_diffs),
                                                                                                 Closest_diff_sd = sd(Closest_df$Closest_diffs),
-                                                                                                EMD2D = EMD2D,
+                                                                                                # EMD2D = EMD2D,
                                                                                                 Envir = comparison_iter$Envir,
                                                                                                 Indivs = comparison_iter$Traits,
                                                                                                 ID = EvoResSuc_iter$ID[which(EvoResSuc_iter$rep == b)]
@@ -384,7 +385,7 @@ Overlap_ls <- lapply(X = names(EnvirDist_ls),
                                                                                     # ,
                                                                                     # Comparisons_ls = lapply(comp_ls, "[", -1)
                                                                       )
-                                                                      save(Up_ls, file = file.path(Dir.Exports, paste0("TEMP_", y, "_",  z, "_", b, ".RData")))
+                                                                      save(Up_ls, file = file.path(Dir.Exports, paste0("TEMP_", y, "_",  z, "_", b, "_NoEMD.RData")))
                                                                     }
                                                                     Up_ls
                                                                   })
@@ -413,4 +414,4 @@ Overlap_ls <- lapply(X = names(EnvirDist_ls),
                        Up_ls
                      })
 SpatialOver_df <- do.call(rbind, Overlap_ls)
-write.csv(SpatialOver_df, file = file.path(Dir.Exports, "Distrib_Spatial_df.csv"))
+write.csv(SpatialOver_df, file = file.path(Dir.Exports, "Distrib_Spatial_df_NoEMD.csv"))
