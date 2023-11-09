@@ -225,7 +225,7 @@ Overlap_ls <- lapply(X = order,
                          
                          #### Perturbation Loop ----
                          message("## Perturbation-Loop")
-                         Pert_ls <- lapply(unique(Pop_df$pert.name),
+                         Pert_ls <- lapply(unique(Pop_df$pert.name)[unique(Pop_df$pert.name)>= 9],
                                            FUN = function(z){ #[1:2]
                                              # z <- unique(Pop_df$pert.name)[1] # perturbation magnitude loop here
                                              print(paste("Perturbation:", z))
