@@ -30,7 +30,8 @@ package_vec <- c(
   "pbapply",
   "parallel",
   "ggplot2",
-  "cowplot"
+  "cowplot",
+  "dplyr"
 )
 sapply(package_vec, install.load.package)
 
@@ -176,6 +177,8 @@ save_df <- base::merge(x = runtimes, y = evoressuc_df, by = "ID")
 save_df$EvoRes[which(save_df$perc_minpost < DipCut & save_df$perc_maxpostpre > RebCut)] <- TRUE
 ### removing runs which have abnormalities as identified in evores extraction
 save_df <- save_df[save_df$ID %nin% evoressuc_df$ID[is.na(evoressuc_df$n_minpost)], ]
+### bring back in non-survival runs
+save_df <- bind_rows(save_df, runtimes[!runtimes$survival, ])
 write.csv(save_df, file = file.path(Dir.Exports, "EvoResSuccessMetrics.csv"))
 
 
