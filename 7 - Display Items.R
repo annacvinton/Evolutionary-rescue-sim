@@ -88,3 +88,43 @@ sankey_gg <- ggplot(sankey_df, aes(x = x
 sankey_gg
 
 ## Simulation Abundance Time-Series; Conceptual ---------------------------
+# Data Loading
+load(file.path(Dir.Exports, "NN_Metrics.RData"))
+Abund_df <- Data_df
+rm(Data_df)
+
+# Assigning traceable IDs to abundance data
+AbundIdents <- with(Abund_df, paste(pert.name, rep, AC, DI, MU, SL, VA, sep = "_"))
+EvoResIdents <- with(EvoResSuc_df, paste(pert.name, rep, AC, DI, MU, SL, VA, sep = "_"))
+Abund_df$ID <- EvoResSuc_df$ID[match(AbundIdents, EvoResIdents)]
+
+# match outcomes to to IDs
+Abund_df$survival <- EvoResSuc_df$survival[match(Abund_df$ID, EvoResSuc_df$ID)]
+Abund_df$EvoRes <- EvoResSuc_df$EvoRes[match(Abund_df$ID, EvoResSuc_df$ID)]
+Abund_df$Outcome <- str_replace_all(Abund_df$EvoRes, c("TRUE" = "Evolutionary Rescue", 
+                                                       "FALSE" = "No Evolutionary Rescue",
+                                                       "Not Possible" = "Extinction"))
+Abund_df <- Abund_df[!is.na(Abund_df$Outcome), ]
+
+# Subsetting for perturbation 10 due to good split of outcomes
+Abundplot_df <- Abund_df[Abund_df$pert.name == 10, ]
+Abundplot_df <- Abundplot_df[Abundplot_df$t <= 1000, ]
+Abundplot_df <- Abundplot_df[Abundplot_df$t >= 310, ]
+message("ATTENTION ATTENTION - RE-INVESTIGATE HOW EXTINCTION IS CLASSIFIED/ASSIGNED. MAY HAVE TO CLEAN MORE FOR CRAPPED OUT RUNS")
+Abundplot_df$n[Abundplot_df$Outcome == "Extinction" & Abundplot_df$t > 470 & Abundplot_df$n > 100] <- 0
+
+# making means and standard deviations for plotting
+Abundplot_df <- data.frame(aggregate(x = n ~ t+Outcome, data = Abundplot_df, FUN = mean),
+                           sd = aggregate(x = n ~ t+Outcome, data = Abundplot_df, FUN = sd)[,3])
+Abundplot_df$sd[is.na(Abundplot_df$sd)] <- 0
+
+# plotting
+ConceptTime_gg <- ggplot(Abundplot_df, aes(x = t, y = n, fill = Outcome, color = Outcome)) + 
+  geom_point(alpha = 0.1) +
+  geom_line() + 
+  geom_ribbon(aes(y = n, ymin = ifelse((n - sd) < 0, 0, n - sd), ymax = n + sd, fill = Outcome), alpha = .2) + 
+  scale_fill_viridis_d() + 
+  scale_color_viridis_d() + 
+  ylim(c(0, NA)) +
+  theme_bw()
+ConceptTime_gg
