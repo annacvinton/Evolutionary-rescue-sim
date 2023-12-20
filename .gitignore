@@ -44,6 +44,8 @@ DISCARD/*
 Logo/*
 Exports/*
 Icon*
+Manuscript/
+EvoResHPC
 
 *.Rproj
 *.DS_Store
