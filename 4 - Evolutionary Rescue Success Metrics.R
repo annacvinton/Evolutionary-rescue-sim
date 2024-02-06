@@ -39,7 +39,8 @@ sapply(package_vec, install.load.package)
 `%nin%` <- Negate(`%in%`) # a function for negation of %in% function
 
 # DATA ====================================================================
-load(file.path(Dir.Exports, "NN_Metrics.RData"))
+# load(file.path(Dir.Exports, "NN_Metrics.RData"))
+load(file.path(Dir.Exports, "SummaryTimeStep.RData"))
 conditions <- Data_df[,c("pert.name", "rep", "AC", "DI", "SL", "VA", "MU")]
 conditions <- conditions[which(!duplicated(conditions)), ]
 
@@ -179,7 +180,7 @@ save_df$EvoRes[which(save_df$perc_minpost < DipCut & save_df$perc_maxpostpre > R
 save_df <- save_df[save_df$ID %nin% evoressuc_df$ID[is.na(evoressuc_df$n_minpost)], ]
 ### bring back in non-survival runs
 save_df <- bind_rows(save_df, runtimes[!runtimes$survival, ])
-write.csv(save_df, file = file.path(Dir.Exports, "EvoResSuccessMetrics.csv"))
+# write.csv(save_df, file = file.path(Dir.Exports, "EvoResSuccessMetrics.csv"))
 
 
 ## INDIVIDUAL run plotting according to evolutionary rescue or not
