@@ -49,7 +49,7 @@ library(ggsankey)
 ## Sankey Plot of Simulation Run Classifications --------------------------
 # data loading
 EvoResSuc_df <- read.csv(file.path(Dir.Exports, "EvoResSuccessMetrics.csv"))
-EvoResSuc_df$EvoRes[is.na(EvoResSuc_df$EvoRes)] <- "Not Possible"
+EvoResSuc_df$EvoRes[!EvoResSuc_df$survival] <- "Not Possible"
 
 # data extraction
 sankey_df <- EvoResSuc_df[, c("pert.name", "survival", "EvoRes")]
@@ -60,16 +60,26 @@ colnames(sankey_df) <- c("Perturbation Magnitude", "Survival", "Evolutionary Res
 sankey_df <- sankey_df[sankey_df$`Perturbation Magnitude` >= 9, ]
 sankey_df$`Perturbation Magnitude` <- str_pad(sankey_df$`Perturbation Magnitude`, width = 2, side = "left", pad = "0")
 sankey_df$Survival <- str_replace_all(sankey_df$Survival, c("TRUE" = "Survival", "FALSE" = "Extinction"))
+
 sankey_df$`Evolutionary Rescue` <- str_replace_all(sankey_df$`Evolutionary Rescue`, c("TRUE" = "Evolutionary Rescue", "FALSE" = "No Evolutionary Rescue"))
 
+
 # data orientation for plotting
-sankey_df <- make_long(sankey_df, "Simulation", "Perturbation Magnitude", "Survival", "Evolutionary Rescue")
+sankey_df <- make_long(sankey_df, 
+                       "Simulation", "Perturbation Magnitude", 
+                       "Survival", "Evolutionary Rescue")
 sankey_count <- sankey_df%>%
   dplyr::group_by(node)%>%
   tally()
 sankey_df <- merge(sankey_df, sankey_count, by.x = 'node', by.y = 'node', all.x = TRUE)
 
-sankey_gg <- ggplot(sankey_df, aes(x = x
+sankey_df$node <- factor(sankey_df$node, levels = c("09", "10", "11", "12", "13", "14", "15", "16", "Evolutionary Rescue", "Survival", "Extinction", "No Evolutionary Rescue", "Not Possible", "Total Simulations"))
+sankey_df$next_node <- factor(sankey_df$next_node, levels = c("09", "10", "11", "12", "13", "14", "15", "16", "Evolutionary Rescue", "Survival", "Extinction", "No Evolutionary Rescue", "Not Possible", "Total Simulations"))
+
+sankey_df$node[which(sankey_df$node == "Not Possible")] <- NA
+
+
+sankey_gg <- ggplot(sankey_df[!is.na(sankey_df$node), ], aes(x = x
                , next_x = next_x
                , node = node
                , next_node = next_node
@@ -89,7 +99,7 @@ sankey_gg
 
 ## Simulation Abundance Time-Series; Conceptual ---------------------------
 # Data Loading
-load(file.path(Dir.Exports, "NN_Metrics.RData"))
+load(file.path(Dir.Exports, "SummaryTimeStep.RData"))
 Abund_df <- Data_df
 rm(Data_df)
 
@@ -110,8 +120,8 @@ Abund_df <- Abund_df[!is.na(Abund_df$Outcome), ]
 Abundplot_df <- Abund_df[Abund_df$pert.name == 10, ]
 Abundplot_df <- Abundplot_df[Abundplot_df$t <= 1000, ]
 Abundplot_df <- Abundplot_df[Abundplot_df$t >= 310, ]
-message("ATTENTION ATTENTION - RE-INVESTIGATE HOW EXTINCTION IS CLASSIFIED/ASSIGNED. MAY HAVE TO CLEAN MORE FOR CRAPPED OUT RUNS")
-Abundplot_df$n[Abundplot_df$Outcome == "Extinction" & Abundplot_df$t > 470 & Abundplot_df$n > 100] <- 0
+# message("ATTENTION ATTENTION - RE-INVESTIGATE HOW EXTINCTION IS CLASSIFIED/ASSIGNED. MAY HAVE TO CLEAN MORE FOR CRAPPED OUT RUNS")
+# Abundplot_df$n[Abundplot_df$Outcome == "Extinction" & Abundplot_df$t > 470 & Abundplot_df$n > 100] <- 0
 
 # making means and standard deviations for plotting
 Abundplot_df <- data.frame(aggregate(x = n ~ t+Outcome, data = Abundplot_df, FUN = mean),
@@ -128,3 +138,6 @@ ConceptTime_gg <- ggplot(Abundplot_df, aes(x = t, y = n, fill = Outcome, color =
   ylim(c(0, NA)) +
   theme_bw()
 ConceptTime_gg
+
+# DipCut <- 0.1 # go down to below 10% of pre-perturbation abundance
+# RebCut <- 0.5 # bounce back to at least 50% of pre-perturbation abundance
