@@ -42,7 +42,7 @@ sapply(package_vec, install.load.package)
 `%nin%` <- Negate(`%in%`) # a function for negation of %in% function
 
 # DATA ====================================================================
-cl <- parallel::makeCluster(parallel::detectCores()) # parallel::detectCores()
+cl <- parallel::makeCluster(parallel::detectCores()/2) # parallel::detectCores()
 parallel::clusterExport(cl,
                         varlist = c("Dir.Data", "install.load.package", "package_vec"),
                         envir = environment()
@@ -52,15 +52,6 @@ clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.pack
 ## Loading & Extraction ---------------------------------------------------
 Sims_fs <- list.files(Dir.Data, ".rds")
 
-"AC_20_0_1.5_0_1_25"
-
-
-testfile <- paste("AC0", "DI1.5", "MU0", "SL1", "VA25", sep="_")
-x <- paste0(testfile, ".rds")
-
-10
-20
-
 Data_ls <- pblapply(Sims_fs, 
                     cl = cl,
                     function(x){
@@ -69,7 +60,7 @@ Data_ls <- pblapply(Sims_fs,
   data_df <- readRDS(file.path(Dir.Data, x))
   
   duplicates_check <- with(data_df, paste(
-    pert.value, pert.name, rep, t, sep = "_"
+    pert.name, rep, t, sep = "_"
   ))
   # data_df <- data_df[!duplicated(duplicates_check), 1:5]
   
@@ -82,33 +73,41 @@ Data_ls <- pblapply(Sims_fs,
   VA <- Ident_vec[5]
   
   ## total population size
-  N <- aggregate(n ~ t+pert.value+pert.name+rep, data = data_df, FUN = mean)
+  N <- aggregate(n ~ t+pert.name+rep, data = data_df, FUN = mean)
   N$AC <- AC
   N$DI <- DI
   N$MU <- MU
   N$SL <- SL
   N$VA <- VA
-  
+
   ## trait measures
-  u_mean <- aggregate(u ~ t+pert.value+pert.name+rep, data = data_df, FUN = mean)$u
-  u_sd <- aggregate(u ~ t+pert.value+pert.name+rep, data = data_df, FUN = sd)$u
-  u_skewness <- aggregate(u ~ t+pert.value+pert.name+rep, data = data_df, FUN = e1071::skewness)$u
-  u_kurtosis <- aggregate(u ~ t+pert.value+pert.name+rep, data = data_df, FUN = e1071::kurtosis)$u
+  u_mean <- aggregate(u ~ t+pert.name+rep, data = data_df,
+                      FUN = mean)$u
+  u_sd <- aggregate(u ~ t+pert.name+rep, data = data_df,
+                    FUN = sd)$u
+  u_skewness <- aggregate(u ~ t+pert.name+rep, data = data_df,
+                          FUN = e1071::skewness)$u
+  u_kurtosis <- aggregate(u ~ t+pert.name+rep, data = data_df,
+                          FUN = e1071::kurtosis)$u
   ## adaptedness measures
   AdaptFunc <- function(SL, x ,u, patch){
     abs(SL*x+patch - u)
   }
-  data_df$MalAdaptedness <- do.call(function(SL, x ,u, patch) AdaptFunc(SL, x, u, patch), 
+  data_df$MalAdaptedness <- do.call(function(SL, x ,u, patch) AdaptFunc(SL, x, u, patch),
                                     args = list(data_df$x,
                                                 data_df$u,
-                                                data_df$patch, 
+                                                data_df$patch,
                                                 SL)
   )
-  MalAdap_mean <- aggregate(MalAdaptedness ~ t+pert.value+pert.name+rep, data = data_df, FUN = mean)$MalAdaptedness
-  MalAdap_sd <- aggregate(MalAdaptedness ~ t+pert.value+pert.name+rep, data = data_df, FUN = sd)$MalAdaptedness
-  MalAdap_skewness <- aggregate(MalAdaptedness ~ t+pert.value+pert.name+rep, data = data_df, FUN = e1071::skewness)$MalAdaptedness
-  MalAdap_kurtosis <- aggregate(MalAdaptedness ~ t+pert.value+pert.name+rep, data = data_df, FUN = e1071::kurtosis)$MalAdaptedness
-  
+  MalAdap_mean <- aggregate(MalAdaptedness ~ t+pert.name+rep, data = data_df,
+                            FUN = mean)$MalAdaptedness
+  MalAdap_sd <- aggregate(MalAdaptedness ~ t+pert.name+rep, data = data_df,
+                          FUN = sd)$MalAdaptedness
+  MalAdap_skewness <- aggregate(MalAdaptedness ~ t+pert.name+rep, data = data_df,
+                                FUN = e1071::skewness)$MalAdaptedness
+  MalAdap_kurtosis <- aggregate(MalAdaptedness ~ t+pert.name+rep, data = data_df,
+                                FUN = e1071::kurtosis)$MalAdaptedness
+
   ## spatial measures
   min.d <- c()
   SimSteps <- unique(duplicates_check) # loop over all individual combinations of timesteps respective to simulation runs
@@ -126,12 +125,17 @@ Data_ls <- pblapply(Sims_fs,
   }
   data_df$NN_Distance <- min.d
 
-  NNDist_mean <- aggregate(NN_Distance ~ t+pert.value+pert.name+rep, data = data_df, FUN = mean, na.action = NULL)$NN_Distance
-  NNDist_sd <- aggregate(NN_Distance ~ t+pert.value+pert.name+rep, data = data_df, FUN = sd, na.action = NULL)$NN_Distance
-  NNDist_skewness <- aggregate(NN_Distance ~ t+pert.value+pert.name+rep, data = data_df, FUN = e1071::skewness, na.action = NULL)$NN_Distance
-  NNDist_kurtosis <- aggregate(NN_Distance ~ t+pert.value+pert.name+rep, data = data_df, FUN = e1071::kurtosis, na.action = NULL)$NN_Distance
+  NNDist_mean <- aggregate(NN_Distance ~ t+pert.name+rep, data = data_df,
+                           FUN = mean, na.action = NULL)$NN_Distance
+  NNDist_sd <- aggregate(NN_Distance ~ t+pert.name+rep, data = data_df,
+                         FUN = sd, na.action = NULL)$NN_Distance
+  NNDist_skewness <- aggregate(NN_Distance ~ t+pert.name+rep, data = data_df,
+                               FUN = e1071::skewness, na.action = NULL)$NN_Distance
+  NNDist_kurtosis <- aggregate(NN_Distance ~ t+pert.name+rep, data = data_df,
+                               FUN = e1071::kurtosis, na.action = NULL)$NN_Distance
   
   ## final data frame
+  # N
   cbind(N,
         data.frame(
           u_mean = u_mean,
@@ -152,7 +156,9 @@ Data_ls <- pblapply(Sims_fs,
 })
 
 Data_df <- do.call(rbind, Data_ls)
-hist(as.numeric(Data_df$n), breaks = 100)
+Data_df$ID <- with(Data_df, paste(AC, DI, MU, SL, VA, pert.name, rep, sep = "-"))
+length(unique(Data_df$ID))
+
 stopCluster(cl)
 
-save(Data_df, file = file.path(Dir.Exports, "NN_Metrics.RData"))
+save(Data_df, file = file.path(Dir.Exports, "SummaryTimeStep.RData"))
