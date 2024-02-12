@@ -3,12 +3,13 @@
 #' CONTENTS: 
 #'  - Comparison of landscape parameter distributions and individual trait distributions
 #'  DEPENDENCIES:
-#'  - 
+#'  - EVORES_Metrics.RData produced by "4 - Evolutionary Rescue Success Metrics.R"
+#'  - ENVIRONMENT_Cells.RData produced by "3 - Landscape Readout.R"
 #' AUTHOR: [Erik Kusch]
 #' ####################################################################### #
 
 # PREAMBLE ================================================================
-# rm(list=ls())
+rm(list=ls())
 
 ## Directories ------------------------------------------------------------
 ### Define dicrectories in relation to project directory
@@ -44,31 +45,32 @@ sapply(package_vec, install.load.package)
 `%nin%` <- Negate(`%in%`) # a function for negation of %in% function
 
 # DATA ====================================================================
-EvoResSuc_df <- read.csv(file = file.path(Dir.Exports, "EvoResSuccessMetrics.csv"))
-EvoResSuc_df <- EvoResSuc_df[EvoResSuc_df$survival, ]
-load(file = file.path(Dir.Exports, "EnviroDist_ls.RData")) # load EnvirDist_ls
+load(file.path(Dir.Exports, "EVORES_Metrics.RData")) # load EVORES_Metrics
+EvoResSuc_df <- EVORES_Metrics[EVORES_Metrics$survival, ]
+load(file.path(Dir.Exports, "ENVIRONMENT_Cells.RData")) # load Enviro_Cells_ls
 
 ## Non-Spatially Explicit Overlaps ----------------------------------------
-if(file.exists(file.path(Dir.Exports, "Distrib_NonSpatial_df.csv"))){
-  Overlap_df <- read.csv(file.path(Dir.Exports, "Distrib_NonSpatial_df.csv"))
+if(file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData"))){
+  load(file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData")) # loads DISTRIBUTIONS_NonSpatial
 }else{
   nC <- parallel::detectCores()
   # if(Sys.info()['sysname'] == "Linux"){cl = nC}
   cl <- makeCluster(nC)
   clusterExport(cl = cl, varlist = c("Dir.Data", "install.load.package", "package_vec"))
   clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
-  clusterExport(cl = cl, varlist = c("EnvirDist_ls", "EvoResSuc_df"))
-  Overlap_ls <- pblapply(X = names(EnvirDist_ls),
-                         cl = cl,
+  clusterExport(cl = cl, varlist = c("Enviro_Cells_ls", "EvoResSuc_df"))
+  Overlap_ls <- pblapply(X = names(Enviro_Cells_ls),
+                         # cl = cl,
                          FUN = function(x){
-                           # x <- names(EnvirDist_ls)[1]
-                           message(paste("EnvirDistName =", x))
+                           # x <- names(Enviro_Cells_ls)[1]
 
                            # Environment Data
                            AC <- as.numeric(unlist(strsplit(x = x, split = "_"))[1])
                            VA <- as.numeric(unlist(strsplit(x = x, split = "_"))[2])
                            SL <- as.numeric(unlist(strsplit(x = x, split = "_"))[3])
 
+                           message(paste("AC =", AC, "; VA =", VA, "; SL =", SL))
+                           
                            # Individual Data
                            Pop_fs <- list.files(Dir.Data, pattern = ".rds")
                            Iter_fs <- Pop_fs[grep(paste0("AC", AC, "_"), Pop_fs)]
@@ -110,21 +112,21 @@ if(file.exists(file.path(Dir.Exports, "Distrib_NonSpatial_df.csv"))){
                                                           Traits = c("Pre", "PostMin", "PostMax"))
 
                                  plot_df <- data.frame(Value = c(
-                                   EnvirDist_ls[[x]],
-                                   EnvirDist_ls[[x]]+z,
+                                   Enviro_Cells_ls[[x]],
+                                   Enviro_Cells_ls[[x]]+z,
                                    Popb_df$u[Popb_df$t == 460],
                                    Popb_df$u[Popb_df$t == t_min],
                                    Popb_df$u[Popb_df$t == t_max]
                                  ),
                                  Origin = c(
-                                   rep("Environment", (length(EnvirDist_ls[[x]]))*2),
+                                   rep("Environment", (length(Enviro_Cells_ls[[x]]))*2),
                                    rep("Individuals", length(Popb_df$u[Popb_df$t == 460])),
                                    rep("Individuals", length(Popb_df$u[Popb_df$t == t_min])),
                                    rep("Individuals", length(Popb_df$u[Popb_df$t == t_max]))
                                  ),
                                  Time = c(
-                                   rep("Pre", length(EnvirDist_ls[[x]])),
-                                   rep("Post", length(EnvirDist_ls[[x]])),
+                                   rep("Pre", length(Enviro_Cells_ls[[x]])),
+                                   rep("Post", length(Enviro_Cells_ls[[x]])),
                                    rep("Pre", length(Popb_df$u[Popb_df$t == 460])),
                                    rep("PostMin", length(Popb_df$u[Popb_df$t == t_min])),
                                    rep("PostMax", length(Popb_df$u[Popb_df$t == t_max]))
@@ -167,8 +169,8 @@ if(file.exists(file.path(Dir.Exports, "Distrib_NonSpatial_df.csv"))){
                                    SL = rep(SL, nrow(comparison)),
                                    Pert = rep(z, nrow(comparison)),
                                    rep = rep(b, nrow(comparison)),
-                                   OV_Dens = OVERLAP,
-                                   OV_Perc = OV_perc,
+                                   OV_Dens = OVERLAP, # shared area between both density curves divided by their combined total area 
+                                   OV_Perc = OV_perc, # percentage of trait values who fall within the range of the environment values
                                    Envir = comparison$Envir,
                                    Indivs = comparison$Traits,
                                    ID = EvoResSuc_iter$ID[which(EvoResSuc_iter$rep == b)]
@@ -180,26 +182,26 @@ if(file.exists(file.path(Dir.Exports, "Distrib_NonSpatial_df.csv"))){
                            })
                            do.call(rbind, Iter_ls)
                          })
-  Overlap_df <- do.call(rbind, Overlap_ls)
-  write.csv(Overlap_df, file = file.path(Dir.Exports, "Distrib_NonSpatial_df.csv"))
+  DISTRIBUTIONS_NonSpatial <- do.call(rbind, Overlap_ls)
+  save(DISTRIBUTIONS_NonSpatial, file = file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData"))
+  closeAllConnections()
 }
 
 ## Spatially Explicit Overlaps --------------------------------------------
-# start_n = 1
-# direction_n = -1
-order <- names(EnvirDist_ls)#[start_n:length(EnvirDist_ls)]
-nC <- ifelse(length(order)>16, 16, length(order))
+order <- names(Enviro_Cells_ls)#[start_n:length(Enviro_Cells_ls)]
+
+nC <- ifelse(length(order)>parallel::detectCores(), parallel::detectCores(), length(order))
 cl <- makeCluster(nC)
 clusterExport(cl = cl, varlist = c("Dir.Data", "Dir.Exports", "install.load.package", "package_vec", "%nin%",
                                    "EvoResSuc_df"),
               envir=environment())
 clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
 
-# if(direction_n == -1){order <- rev(order)}
 Overlap_ls <- pblapply(X = order,
                      cl = cl,
                      FUN = function(x){
                        # x <- order[2]
+                       
                        # Environment Data
                        AC <- as.numeric(unlist(strsplit(x = x, split = "_"))[1])
                        VA <- as.numeric(unlist(strsplit(x = x, split = "_"))[2])
@@ -216,11 +218,13 @@ Overlap_ls <- pblapply(X = order,
                        Pop_fs <- list.files(Dir.Data, pattern = ".rds")
                        Iter_fs <- Pop_fs[grep(paste0("AC", AC), Pop_fs)]
                        Iter_fs <- Iter_fs[grep(paste0("VA", VA), Iter_fs)]
-                       Iter_fs <- Iter_fs[grep(paste0("SL", ifelse(SL == 0.8, ".8", SL)), Iter_fs)]
+                       SLCheck <- ifelse(SL == 0.8, ".8", SL)
+                       SLCheck <- ifelse(SL == 1, "1_", SL)
+                       Iter_fs <- Iter_fs[grep(paste0("SL", SLCheck), Iter_fs)]
                        
                        Iter_ls <- lapply(Iter_fs, FUN = function(y){
                          # y <- Iter_fs[1]
-                         print(paste("File =", y))
+                         print(paste("File =", y, "|", which(Iter_fs == y), "/", length(Iter_fs)))
                          Pop_df <- readRDS(file.path(Dir.Data, y))
                          Characteristics <- as.numeric(unlist(regmatches(unlist(strsplit(x = y, split = "_")),
                                                                          gregexpr("[[:digit:]]+\\.*[[:digit:]]*",
@@ -230,13 +234,13 @@ Overlap_ls <- pblapply(X = order,
                          MU <- Characteristics[3]
                          
                          #### Perturbation Loop ----
-                         message("## Perturbation-Loop")
+                         # message("## Perturbation-Loop")
                          perts_vec <- unique(Pop_df$pert.name)[unique(Pop_df$pert.name)>= 9]
                          Pert_ls <- lapply(perts_vec,
                                              # cl = cl,
                                              FUN = function(z){ #[1:2]
                                                # z <- unique(Pop_df$pert.name)[1] # perturbation magnitude loop here
-                                               print(paste("Perturbation:", z))
+                                               # print(paste("Perturbation:", z))
                                                Pop_df <- Pop_df[Pop_df$pert.name == z,] 
                                                EvoResSuc_iter <- EvoResSuc_df[EvoResSuc_df$pert.name == z & 
                                                                                 EvoResSuc_df$AC == AC & 
@@ -253,7 +257,9 @@ Overlap_ls <- pblapply(X = order,
                                                                 # cl = cl,
                                                                 FUN = function(b){
                                                                   # b <- EvoResSuc_iter$rep[1]
-                                                                  print(paste("Perturbation:", z, "| Rep =", b))
+                                                                  message(paste("Perturbation:", z, 
+                                                                                "| Rep =", which(unique(EvoResSuc_iter$rep) == b), 
+                                                                                "/", length(unique(EvoResSuc_iter$rep))))
                                                                   
                                                                   Popb_df <- Pop_df[Pop_df$rep == b,]
                                                                   
@@ -271,44 +277,38 @@ Overlap_ls <- pblapply(X = order,
                                                                     comp_ls <- lapply(1:nrow(comparison), 
                                                                                         # cl = cl,
                                                                                         FUN = function(comp_iter){
-                                                                                          # comp_iter <- 2
+                                                                                          # comp_iter <- 1
                                                                                           t_iter <- c(460, t_min, t_max)[comp_iter]
                                                                                           comparison_iter <- comparison[comp_iter,]
-                                                                                          print(paste("Comparison:", paste(comparison_iter, collapse = " vs. ")))
+                                                                                          # message("Comparison: ", paste(comparison_iter, collapse = " vs. "))
                                                                                           
                                                                                           ## select correct environment layer
                                                                                           Enviro_iter <- Enviro_ls[[which(names(Enviro_ls) == comparison_iter$Envir)]]
                                                                                           
                                                                                           ## make spatialpoints object and raster of individuals
-                                                                                          Indivs_sp <- Pop_df[Pop_df$t == t_iter, ] ## right before perturbation
-                                                                                          if(nrow(Indivs_sp) == 0){
+                                                                                          Indivs_sp <- Popb_df[Popb_df$t == t_iter, ] ## right before perturbation
+                                                                                          if(nrow(Indivs_sp) == 0){ # this should not be triggered anymore
                                                                                             Indivs_stack <- NULL
                                                                                             Ras_abs <- NULL
                                                                                             Best_df <- NULL
                                                                                             Closest_df <- NULL
+                                                                                            Weighted_maladap <- NULL
                                                                                             # EMD2D <- NULL
                                                                                           }else{
                                                                                             coordinates(Indivs_sp) <- ~x+y
                                                                                             Indivs_ras <- rasterize(x = Indivs_sp[,"u"], y = Enviro_ras, fun = mean)$u
                                                                                             IndivsSD_ras <- rasterize(x = Indivs_sp[,"u"], y = Enviro_ras, fun = sd)$u
                                                                                             
-                                                                                            # ## Contrast spatially explicit distributions
-                                                                                            # plot(Indivs_ras, colNA = "grey")
-                                                                                            # plot(Enviro_ras)
-                                                                                            # 
-                                                                                            # plot(abs(Indivs_ras-Enviro_ras), colNA = "grey")
-                                                                                            # hist(abs(values(Indivs_ras-Enviro_ras)))
-                                                                                            
                                                                                             # Raster differences
                                                                                             Ras_abs <- abs(Indivs_ras-Enviro_iter)
-                                                                                            # plot(Ras_abs, colNA = "grey")
                                                                                             
                                                                                             # # EMD
                                                                                             # set.seed(42)
                                                                                             # EMD2D <- emd2d(matrix(Indivs_ras, ncol = 100), matrix(Enviro_iter, ncol = 100), max.iter = 1e3)
                                                                                             
                                                                                             # Best-suited environment
-                                                                                            Best_df <- apply(Pop_df, MARGIN = 1, FUN = function(p){
+                                                                                            # print("Best cell distance and difference")
+                                                                                            Best_df <- apply(data.frame(Indivs_sp), MARGIN = 1, FUN = function(p){
                                                                                               Indiv_iter <- p
                                                                                               ## Cell ID
                                                                                               Best_cell <- which.min(abs(values(Enviro_iter)-Indiv_iter["u"]))
@@ -331,7 +331,8 @@ Overlap_ls <- pblapply(X = order,
                                                                                             Best_df <- do.call(rbind, Best_df)
                                                                                             
                                                                                             # Closest Distance to Matching Environment
-                                                                                            Closest_ls <- apply(Pop_df, MARGIN = 1, FUN = function(p){
+                                                                                            # print("Closest suitable distance and difference")
+                                                                                            Closest_ls <- apply(data.frame(Indivs_sp), MARGIN = 1, FUN = function(p){
                                                                                               Indiv_iter <- p
                                                                                               ## Cell IDs
                                                                                               # message("Matching environment is abs(trait - envir) < 3")
@@ -355,6 +356,30 @@ Overlap_ls <- pblapply(X = order,
                                                                                             })
                                                                                             Closest_df <- data.frame(Closest_diffs = unlist(lapply(Closest_ls, "[[", "Closest_diffs")), 
                                                                                                                      Closest_dists = unlist(lapply(Closest_ls, "[[", "Closest_dists"))) 
+                                                                                            
+                                                                                            # Weighted distance by adaptdeness
+                                                                                            # print("Distance-weighted adaptedness")
+                                                                                            Weighted_ls <- apply(data.frame(Indivs_sp), MARGIN = 1, FUN = function(p){
+                                                                                              Indiv_iter <- p
+                                                                                              ## Cell IDs
+                                                                                              # message("Matching environment is abs(trait - envir) < 3")
+                                                                                              ## Differences
+                                                                                              Weighted_maladap <- abs(values(Enviro_iter)-as.numeric(Indiv_iter["u"]))
+                                                                                              ## Distances
+                                                                                              Weighted_dists <- pointDistance(p1 = Indiv_iter[c("x", "y")], # individual location, 
+                                                                                                                             p2 = coordinates(Enviro_iter), # centroids of all cells
+                                                                                                                             lonlat = FALSE, allpairs = FALSE)
+                                                                                              
+                                                                                              
+                                                                                              ## Distance to
+                                                                                              
+                                                                                              ## reporting back
+                                                                                              list(
+                                                                                                Weighted_maladap = Weighted_maladap/Weighted_dists,
+                                                                                                ID = Indiv_iter["id"]
+                                                                                              )
+                                                                                            })
+                                                                                            Weighted_maladap <- as.numeric(unlist(lapply(Weighted_ls, "[[", "Weighted_maladap")))
                                                                                           }
                                                                                           # Saving summary metrics
                                                                                           list(
@@ -364,58 +389,54 @@ Overlap_ls <- pblapply(X = order,
                                                                                               SL = SL,
                                                                                               Pert = z,
                                                                                               rep = b, 
-                                                                                              Best_dist_med = ifelse(is.null(median(Best_df$Best_dist)), NA, median(Best_df$Best_dist)),
+                                                                                              ## best environmental cell
+                                                                                              Best_dist_mean = ifelse(is.null(mean(Best_df$Best_dist)), NA, mean(Best_df$Best_dist)),
                                                                                               Best_dist_sd = ifelse(is.null(sd(Best_df$Best_dist)), NA, sd(Best_df$Best_dist)),
-                                                                                              Best_diff_med = ifelse(is.null(median(Best_df$Best_diff)), NA, median(Best_df$Best_diff)),
+                                                                                              Best_diff_mean = ifelse(is.null(mean(Best_df$Best_diff)), NA, mean(Best_df$Best_diff)),
                                                                                               Best_diff_sd = ifelse(is.null(sd(Best_df$Best_diff)), NA, sd(Best_df$Best_diff)),
-                                                                                              Closest_dist_med = ifelse(is.null(median(Closest_df$Closest_dists)), NA, median(Closest_df$Closest_dists)),
-                                                                                              Closest_dist_sd = ifelse(is.null(sd(Closest_df$Closest_dists)), NA, sd(Closest_df$Closest_dists)),
-                                                                                              Closest_diff_med = ifelse(is.null(median(Closest_df$Closest_diffs)), NA, median(Closest_df$Closest_diffs)),
-                                                                                              Closest_diff_sd = ifelse(is.null(sd(Closest_df$Closest_diffs)), NA, sd(Closest_df$Closest_diffs)),
+                                                                                              ## closest cell whose value is less than 3 units away from individual traits
+                                                                                              Closest_dist_mean = ifelse(is.null(Closest_df), NA, mean(Closest_df$Closest_dists)),
+                                                                                              Closest_dist_sd = ifelse(is.null(Closest_df), NA, sd(Closest_df$Closest_dists)),
+                                                                                              Closest_diff_mean = ifelse(is.null(Closest_df), NA, mean(Closest_df$Closest_diffs)),
+                                                                                              Closest_diff_sd = ifelse(is.null(Closest_df), NA, sd(Closest_df$Closest_diffs)),
+                                                                                              ## Weighted maladaptedness in full environment (weighted by distance)
+                                                                                              Weighted_maladap_mean = ifelse(is.null(Weighted_maladap), NA, mean(Weighted_maladap)),
+                                                                                              Weighted_maladap_sd = ifelse(is.null(Weighted_maladap), NA, sd(Weighted_maladap)),
                                                                                               # EMD2D = EMD2D,
                                                                                               Envir = comparison_iter$Envir,
                                                                                               Indivs = comparison_iter$Traits,
                                                                                               ID = EvoResSuc_iter$ID[which(EvoResSuc_iter$rep == b)]
-                                                                                            )
-                                                                                            # ,
-                                                                                            # RasterDiff = Ras_abs,
-                                                                                            # Best_df = Best_df,
-                                                                                            # Closest_df = Closest_df
+                                                                                            ),
+                                                                                            RasterDiff = values(Ras_abs)
                                                                                           )
                                                                                         })
                                                                     names(comp_ls) <- paste(comparison$Envir, comparison$Traits, sep = "-")
-                                                                    # stopCluster(cl)
-                                                                    Up_ls <- list(Summary_df = do.call(rbind, lapply(comp_ls, "[[", "Summary_df"))
-                                                                                  # ,
-                                                                                  # Comparisons_ls = lapply(comp_ls, "[", -1
+                                                                    Up_ls <- list(Summary_df = do.call(rbind, lapply(comp_ls, "[[", "Summary_df")),
+                                                                                  RasterDiff = lapply(comp_ls, "[", "RasterDiff")
                                                                     )
                                                                     save(Up_ls, file = file.path(Dir.Exports, paste0("TEMP_", y, "_",  z, "_", b, "_NoEMD.RData")))
                                                                   }
                                                                   Up_ls
                                                                 })
                                                names(rep_ls) <- unique(EvoResSuc_iter$rep)
-                                               Up_ls <- list(Summary_df = do.call(rbind, lapply(rep_ls, "[[", "Summary_df"))
-                                                             # ,
-                                                             # Comparisons_ls = lapply(lapply(rep_ls, "[", -1), "[[", "Comparisons_ls")
-                                               )
-                                               # names(Up_ls) <- c("Summary_df", z)
-                                               # stopCluster(cl)
-                                               # save(Up_ls, file = file.path(Dir.Exports, paste0("TEMP_", y, "_",  z, ".RData")))
-                                               # }
+                                               Up_ls <- list(Summary_df = do.call(rbind, lapply(rep_ls, "[[", "Summary_df")),
+                                                             RasterDiff = lapply(rep_ls, "[[", "RasterDiff"))
                                                Up_ls
                                              }) # Pert_ls loop
-                         Up_ls <- 
-                           # list(Summary_df = 
-                           do.call(rbind, lapply(Pert_ls, "[[", "Summary_df"))
-                         # ,
-                         # Perturbations_ls = lapply(lapply(Pert_ls, "[", -1), "[[", 1)
-                         # )
-                         # names(Up_ls) <- c("Summary_df", z)
-                         # save(Up_ls, file = file.path(Dir.Exports, paste0("TEMP_", Iter_fs, "_",  z, ".RData")))
+                         names(Pert_ls) <- perts_vec
+                         Pert_ls <- Pert_ls[which(!unlist(lapply(lapply(lapply(Pert_ls, "[[", "Summary_df"), nrow), is.null)))] # select only perturbations where survival occured
+                         Up_ls <- list(Summary_df = do.call(rbind, lapply(Pert_ls, "[[", "Summary_df")),
+                                       RasterDiff = lapply(Pert_ls, "[[", "RasterDiff")
+                         )
                          Up_ls
                        }) # Iter_ls loop
-                       Up_ls <- do.call(rbind, Iter_ls)
+                       names(Iter_ls) <- Iter_fs
+                       Up_ls <- list(Summary_df = do.call(rbind, lapply(Iter_ls, "[[", "Summary_df")),
+                                     RasterDiff = lapply(Iter_ls, "[[", "RasterDiff")
+                       )
                        Up_ls
                      }) # Overlap_ls loop
+stop("Summarise list and export")
 SpatialOver_df <- do.call(rbind, Overlap_ls)
 write.csv(SpatialOver_df, file = file.path(Dir.Exports, "Distrib_Spatial_df_NoEMD.csv"))
+stop("unlink temporary files")
