@@ -172,7 +172,8 @@ CombPlots_ls <- lapply(c("Total Simulations", "Survival", "Evolutionary Rescue")
     as_ggplot(leg), ncol = 1, rel_heights = c(1, 0.2))
   Combs_gg
 })
-Combs_gg <- plot_grid(plotlist = CombPlots_ls, ncol = 1)
+Combs_gg <- plot_grid(plotlist = CombPlots_ls, ncol = 1, labels = "auto")
+Combs_gg
 
 ggsave(
   Combs_gg, 
