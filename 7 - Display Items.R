@@ -8,7 +8,7 @@
 #' ####################################################################### #
 
 # PREAMBLE ================================================================
-# rm(list=ls())
+rm(list=ls())
 
 ## Directories ------------------------------------------------------------
 ### Define dicrectories in relation to project directory
@@ -48,7 +48,8 @@ library(ggsankey)
 
 ## Sankey Plot of Simulation Run Classifications --------------------------
 # data loading
-EvoResSuc_df <- read.csv(file.path(Dir.Exports, "EvoResSuccessMetrics.csv"))
+load(file.path(Dir.Exports, "EVORES_Metrics.RData"))
+EvoResSuc_df <- EVORES_Metrics
 EvoResSuc_df$EvoRes[!EvoResSuc_df$survival] <- "Not Possible"
 
 # data extraction
@@ -96,6 +97,8 @@ sankey_gg <- ggplot(sankey_df[!is.na(sankey_df$node), ], aes(x = x
                   , panel.grid = element_blank()) + 
   scale_fill_viridis_d(option = "G", na.translate = FALSE)
 sankey_gg
+
+ggsave(sankey_gg, filename = file.path(Dir.Exports, "PLOT_Sankey.png"), width = 16*2, height = 9*2, units = "cm")
 
 ## Simulation Abundance Time-Series; Conceptual ---------------------------
 # Data Loading
