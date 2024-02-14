@@ -145,13 +145,15 @@ Combs_df$Survival <- aggregate(Survival ~ `Spatial Autocorrelation` + `Spatial S
                       data = CombsBase_df, FUN = sum)$Survival
 
 CombPlots_ls <- lapply(c("Total Simulations", "Survival", "Evolutionary Rescue"), function(Outcome_i){
+  print(Outcome_i)
+  colnames(Combs_df)[which(colnames(Combs_df) == Outcome_i)] <- "Outcome"
   Combs_ls <- lapply(unique(Combs_df$`Spatial Variation`), function(VA_i){
     ggplot(data = Combs_df[Combs_df$`Spatial Variation` == VA_i, ],
            aes(x = `Spatial Autocorrelation`, 
                y = `Spatial Slope`, 
                fill = Outcome)) + 
       geom_tile(colour = "black") + 
-      geom_label(aes(label = Outcome), fill = "white") + 
+      geom_label(aes(label = Outcome), fill = "white", size = 2) + 
       theme_bw() + 
       facet_grid(Dispersal ~ Mutation, labeller = label_both) + 
       scale_fill_viridis_c(option = "F", direction = 1, 
@@ -164,16 +166,18 @@ CombPlots_ls <- lapply(c("Total Simulations", "Survival", "Evolutionary Rescue")
       theme(legend.position = "bottom", legend.key.width = unit(3, "cm"))
   })
   leg <- get_legend(Combs_ls[[1]])
-  
   Combs_gg <- plot_grid(
     plot_grid(
       plotlist = lapply(Combs_ls, function(Plot_i){Plot_i + theme(legend.position = "none")}), ncol = 3),
     as_ggplot(leg), ncol = 1, rel_heights = c(1, 0.2))
   Combs_gg
-  
 })
+Combs_gg <- plot_grid(plotlist = CombPlots_ls, ncol = 1)
 
-ggsave(Combs_gg, filename = file.path(Dir.Exports, "PLOT_SettingCombinations.png"), width = 16*3, height = 9*2, units = "cm")
+ggsave(
+  Combs_gg, 
+  filename = file.path(Dir.Exports, "PLOT_SettingCombinations.png"), 
+  width = 16*2, height = 9*4, units = "cm")
 
 
 ## Simulation Abundance Time-Series; Conceptual ---------------------------
