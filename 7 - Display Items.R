@@ -119,9 +119,9 @@ EvoResSuc_df$EvoRes[!EvoResSuc_df$survival] <- "Not Possible"
 EvoResSuc_df[EvoResSuc_df$pert.name >= 9, ]
 
 # data extraction
-Combs_df <- EvoResSuc_df[, c("pert.name", "survival", "EvoRes", 
+CombsBase_df <- EvoResSuc_df[, c("pert.name", "survival", "EvoRes", 
                              "AC", "DI", "MU", "SL", "VA")]
-colnames(Combs_df) <- c("Perturbation Magnitude", "Survival",
+colnames(CombsBase_df) <- c("Perturbation Magnitude", "Survival",
                         "Total Simulations",
                         "Spatial Autocorrelation", "Dispersal", "Mutation",
                         "Spatial Slope", "Spatial Variation")
@@ -130,31 +130,48 @@ colnames(Combs_df) <- c("Perturbation Magnitude", "Survival",
 Combs_df <- aggregate(`Total Simulations` ~ `Spatial Autocorrelation` + `Spatial Slope` + 
                         `Spatial Variation` + 
                         Dispersal + Mutation, 
-                      data = Combs_df, FUN = length)
+                      data = CombsBase_df, FUN = length)
 
-Combs_ls <- lapply(unique(Combs_df$`Spatial Variation`), function(VA_i){
-  ggplot(data = Combs_df[Combs_df$`Spatial Variation` == VA_i, ],
-         aes(x = `Spatial Autocorrelation`, 
-             y = `Spatial Slope`, 
-             fill = `Total Simulations`)) + 
-    geom_tile(colour = "black") + 
-    geom_label(aes(label = `Total Simulations`), fill = "white") + 
-    theme_bw() + 
-    facet_grid(Dispersal ~ Mutation, labeller = label_both) + 
-    scale_fill_viridis_c(option = "F", direction = 1, 
-                         limits=c(min(Combs_df$`Total Simulations`), 
-                                  max(Combs_df$`Total Simulations`))) + 
-    labs(title = paste("Spatial Variation =", VA_i)) + 
-    theme(plot.title = element_text(hjust = 0.5)) + 
-    theme(legend.position = "bottom", legend.key.width = unit(3, "cm"))
+CombsBase_df$`Total Simulations` <- as.logical(CombsBase_df$`Total Simulations`)
+Combs_df$`Evolutionary Rescue` <- aggregate(`Total Simulations` ~ `Spatial Autocorrelation` + `Spatial Slope` + 
+                        `Spatial Variation` + 
+                        Dispersal + Mutation, 
+                      data = CombsBase_df, FUN = sum)$`Total Simulations`
+
+CombsBase_df$Survival <- as.logical(CombsBase_df$Survival)
+Combs_df$Survival <- aggregate(Survival ~ `Spatial Autocorrelation` + `Spatial Slope` + 
+                        `Spatial Variation` + 
+                        Dispersal + Mutation, 
+                      data = CombsBase_df, FUN = sum)$Survival
+
+CombPlots_ls <- lapply(c("Total Simulations", "Survival", "Evolutionary Rescue"), function(Outcome_i){
+  Combs_ls <- lapply(unique(Combs_df$`Spatial Variation`), function(VA_i){
+    ggplot(data = Combs_df[Combs_df$`Spatial Variation` == VA_i, ],
+           aes(x = `Spatial Autocorrelation`, 
+               y = `Spatial Slope`, 
+               fill = Outcome)) + 
+      geom_tile(colour = "black") + 
+      geom_label(aes(label = Outcome), fill = "white") + 
+      theme_bw() + 
+      facet_grid(Dispersal ~ Mutation, labeller = label_both) + 
+      scale_fill_viridis_c(option = "F", direction = 1, 
+                           limits = c(min(Combs_df$Outcome), 
+                                      max(Combs_df$Outcome)), 
+                           name = Outcome_i
+                           ) + 
+      labs(title = paste("Spatial Variation =", VA_i)) + 
+      theme(plot.title = element_text(hjust = 0.5)) + 
+      theme(legend.position = "bottom", legend.key.width = unit(3, "cm"))
+  })
+  leg <- get_legend(Combs_ls[[1]])
+  
+  Combs_gg <- plot_grid(
+    plot_grid(
+      plotlist = lapply(Combs_ls, function(Plot_i){Plot_i + theme(legend.position = "none")}), ncol = 3),
+    as_ggplot(leg), ncol = 1, rel_heights = c(1, 0.2))
+  Combs_gg
+  
 })
-leg <- get_legend(Combs_ls[[1]])
-
-Combs_gg <- plot_grid(
-  plot_grid(
-    plotlist = lapply(Combs_ls, function(Plot_i){Plot_i + theme(legend.position = "none")}), ncol = 3),
-  as_ggplot(leg), ncol = 1, rel_heights = c(1, 0.2))
-Combs_gg
 
 ggsave(Combs_gg, filename = file.path(Dir.Exports, "PLOT_SettingCombinations.png"), width = 16*3, height = 9*2, units = "cm")
 
