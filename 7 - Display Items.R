@@ -31,7 +31,9 @@ package_vec <- c(
   "ggplot2",
   "remotes",
   "stringr",
-  "dplyr"
+  "dplyr",
+  "cowplot",
+  "ggpubr"
 )
 sapply(package_vec, install.load.package)
 
@@ -53,9 +55,16 @@ EvoResSuc_df <- EVORES_Metrics
 EvoResSuc_df$EvoRes[!EvoResSuc_df$survival] <- "Not Possible"
 
 # data extraction
-sankey_df <- EvoResSuc_df[, c("pert.name", "survival", "EvoRes")]
+sankey_df <- EvoResSuc_df[, c("pert.name", "survival", "EvoRes"
+                              # , "AC", "DI", "MU", "SL", "VA"
+                              )]
 sankey_df$Run <- "Total Simulations"
-colnames(sankey_df) <- c("Perturbation Magnitude", "Survival", "Evolutionary Rescue", "Simulation")
+colnames(sankey_df) <- c("Perturbation Magnitude", "Survival", 
+                         "Evolutionary Rescue", "Simulation"
+                         # , 
+                         # "Spatial Autocorrelation", "Dispersal", "Mutation", 
+                         # "Spatial Slope", "Spatial Variation"
+                         )
 
 # data reformatting for plotting
 sankey_df <- sankey_df[sankey_df$`Perturbation Magnitude` >= 9, ]
@@ -64,21 +73,23 @@ sankey_df$Survival <- str_replace_all(sankey_df$Survival, c("TRUE" = "Survival",
 
 sankey_df$`Evolutionary Rescue` <- str_replace_all(sankey_df$`Evolutionary Rescue`, c("TRUE" = "Evolutionary Rescue", "FALSE" = "No Evolutionary Rescue"))
 
-
 # data orientation for plotting
 sankey_df <- make_long(sankey_df, 
-                       "Simulation", "Perturbation Magnitude", 
-                       "Survival", "Evolutionary Rescue")
+                       "Simulation", 
+                       # "Spatial Autocorrelation", "Spatial Slope", "Spatial Variation", "Dispersal", "Mutation",
+                       "Perturbation Magnitude", 
+                       "Survival", "Evolutionary Rescue"
+                       )
 sankey_count <- sankey_df%>%
   dplyr::group_by(node)%>%
   tally()
 sankey_df <- merge(sankey_df, sankey_count, by.x = 'node', by.y = 'node', all.x = TRUE)
 
 sankey_df$node <- factor(sankey_df$node, levels = c("09", "10", "11", "12", "13", "14", "15", "16", "Evolutionary Rescue", "Survival", "Extinction", "No Evolutionary Rescue", "Not Possible", "Total Simulations"))
+
 sankey_df$next_node <- factor(sankey_df$next_node, levels = c("09", "10", "11", "12", "13", "14", "15", "16", "Evolutionary Rescue", "Survival", "Extinction", "No Evolutionary Rescue", "Not Possible", "Total Simulations"))
 
 sankey_df$node[which(sankey_df$node == "Not Possible")] <- NA
-
 
 sankey_gg <- ggplot(sankey_df[!is.na(sankey_df$node), ], aes(x = x
                , next_x = next_x
@@ -95,10 +106,58 @@ sankey_gg <- ggplot(sankey_df[!is.na(sankey_df$node), ], aes(x = x
                   , axis.text.y = element_blank()
                   , axis.ticks = element_blank()  
                   , panel.grid = element_blank()) + 
-  scale_fill_viridis_d(option = "G", na.translate = FALSE)
+  scale_fill_viridis_d(option = "F", direction = 1, na.translate = FALSE)
 sankey_gg
 
 ggsave(sankey_gg, filename = file.path(Dir.Exports, "PLOT_Sankey.png"), width = 16*2, height = 9*2, units = "cm")
+
+## Combinations of Simulation Settings ------------------------------------
+# data loading
+load(file.path(Dir.Exports, "EVORES_Metrics.RData"))
+EvoResSuc_df <- EVORES_Metrics
+EvoResSuc_df$EvoRes[!EvoResSuc_df$survival] <- "Not Possible"
+EvoResSuc_df[EvoResSuc_df$pert.name >= 9, ]
+
+# data extraction
+Combs_df <- EvoResSuc_df[, c("pert.name", "survival", "EvoRes", 
+                             "AC", "DI", "MU", "SL", "VA")]
+colnames(Combs_df) <- c("Perturbation Magnitude", "Survival",
+                        "Total Simulations",
+                        "Spatial Autocorrelation", "Dispersal", "Mutation",
+                        "Spatial Slope", "Spatial Variation")
+
+# tabulating differences
+Combs_df <- aggregate(`Total Simulations` ~ `Spatial Autocorrelation` + `Spatial Slope` + 
+                        `Spatial Variation` + 
+                        Dispersal + Mutation, 
+                      data = Combs_df, FUN = length)
+
+Combs_ls <- lapply(unique(Combs_df$`Spatial Variation`), function(VA_i){
+  ggplot(data = Combs_df[Combs_df$`Spatial Variation` == VA_i, ],
+         aes(x = `Spatial Autocorrelation`, 
+             y = `Spatial Slope`, 
+             fill = `Total Simulations`)) + 
+    geom_tile(colour = "black") + 
+    geom_label(aes(label = `Total Simulations`), fill = "white") + 
+    theme_bw() + 
+    facet_grid(Dispersal ~ Mutation, labeller = label_both) + 
+    scale_fill_viridis_c(option = "F", direction = 1, 
+                         limits=c(min(Combs_df$`Total Simulations`), 
+                                  max(Combs_df$`Total Simulations`))) + 
+    labs(title = paste("Spatial Variation =", VA_i)) + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    theme(legend.position = "bottom", legend.key.width = unit(3, "cm"))
+})
+leg <- get_legend(Combs_ls[[1]])
+
+Combs_gg <- plot_grid(
+  plot_grid(
+    plotlist = lapply(Combs_ls, function(Plot_i){Plot_i + theme(legend.position = "none")}), ncol = 3),
+  as_ggplot(leg), ncol = 1, rel_heights = c(1, 0.2))
+Combs_gg
+
+ggsave(Combs_gg, filename = file.path(Dir.Exports, "PLOT_SettingCombinations.png"), width = 16*3, height = 9*2, units = "cm")
+
 
 ## Simulation Abundance Time-Series; Conceptual ---------------------------
 # Data Loading
