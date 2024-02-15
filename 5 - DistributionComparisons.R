@@ -436,7 +436,7 @@ Overlap_ls <- pblapply(X = order,
                        )
                        Up_ls
                      }) # Overlap_ls loop
-stop("Summarise list and export")
-SpatialOver_df <- do.call(rbind, Overlap_ls)
-write.csv(SpatialOver_df, file = file.path(Dir.Exports, "Distrib_Spatial_df_NoEMD.csv"))
+DISTRIBUTIONS_Spatial <- list(Summary_df = do.call(rbind, lapply(Overlap_ls, "[[", "Summary_df")),
+                              RasterDiff = lapply(Overlap_ls, "[[", "RasterDiff"))
+save(DISTRIBUTIONS_Spatial, file = file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))
 stop("unlink temporary files")
