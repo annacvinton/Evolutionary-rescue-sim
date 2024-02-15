@@ -137,12 +137,14 @@ Combs_df$`Evolutionary Rescue` <- aggregate(`Total Simulations` ~ `Spatial Autoc
                         `Spatial Variation` + 
                         Dispersal + Mutation, 
                       data = CombsBase_df, FUN = sum)$`Total Simulations`
+Combs_df$`Evolutionary Rescue` <- round(Combs_df$`Evolutionary Rescue`/Combs_df$`Total Simulations`, 3)*100
 
 CombsBase_df$Survival <- as.logical(CombsBase_df$Survival)
 Combs_df$Survival <- aggregate(Survival ~ `Spatial Autocorrelation` + `Spatial Slope` + 
                         `Spatial Variation` + 
                         Dispersal + Mutation, 
                       data = CombsBase_df, FUN = sum)$Survival
+Combs_df$Survival <- round(Combs_df$Survival/Combs_df$`Total Simulations`, 3)*100
 
 CombPlots_ls <- lapply(c("Total Simulations", "Survival", "Evolutionary Rescue"), function(Outcome_i){
   print(Outcome_i)
