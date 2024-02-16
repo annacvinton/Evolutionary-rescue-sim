@@ -48,7 +48,8 @@ library(ggsankey)
 
 # DISPLAY ITMES ===========================================================
 
-## Sankey Plot of Simulation Run Classifications --------------------------
+## Data Availability and Simulation Settings ------------------------------
+### Sankey Plot of Simulation Run Classifications ----
 # data loading
 load(file.path(Dir.Exports, "EVORES_Metrics.RData"))
 EvoResSuc_df <- EVORES_Metrics
@@ -111,7 +112,7 @@ sankey_gg
 
 ggsave(sankey_gg, filename = file.path(Dir.Exports, "PLOT_Sankey.png"), width = 16*2, height = 9*2, units = "cm")
 
-## Combinations of Simulation Settings ------------------------------------
+### Combinations of Simulation Settings ----
 # data loading
 load(file.path(Dir.Exports, "EVORES_Metrics.RData"))
 EvoResSuc_df <- EVORES_Metrics
@@ -183,7 +184,8 @@ ggsave(
   width = 16*2, height = 9*4, units = "cm")
 
 
-## Simulation Abundance Time-Series; Conceptual ---------------------------
+## Time-Series Plotting ---------------------------------------------------
+### Abundance; Conceptual ----
 # Data Loading
 load(file.path(Dir.Exports, "SummaryTimeStep.RData"))
 Abund_df <- Data_df
@@ -226,7 +228,6 @@ ConceptTime_gg <- ggplot(Abundplot_df, aes(x = t, y = n, fill = Outcome, color =
   theme_bw()
 ConceptTime_gg
 
-### Overview of all Runs with Cutoffs and resulting classifications ----
 message("can I somehow add the dpcut and rebcut?")
 # DipCut <- 0.1 # go down to below 10% of pre-perturbation abundance
 # RebCut <- 0.5 # bounce back to at least 50% of pre-perturbation abundance
@@ -302,4 +303,14 @@ message("can I somehow add the dpcut and rebcut?")
 # TS_gg
 # ggsave(TS_gg, file = file.path(Dir.Exports, "EvoResRuns_TS.jpg"), width = 22, height = 9, units = "cm")
 
+### Abundance; Full Data ----
+
+### Other Population Metrics; Full Data ----
+
+
 ## Environmental Parameterisation and Actual Environmental Values ---------
+
+## Analyses Inputs and Outcomes -------------------------------------------
+### Survival or Extinction ----
+### Survival or Evolutionary Rescue ----
+### Characteristics of Evolutionary Rescue ----
