@@ -44,7 +44,7 @@ sapply(package_vec, install.load.package)
 
 # DATA ====================================================================
 ## Parallelisation --------------------------------------------------------
-cl <- parallel::makeCluster(parallel::detectCores()-4) # parallel::detectCores()
+cl <- parallel::makeCluster(parallel::detectCores())
 parallel::clusterExport(cl,
                         varlist = c("Dir.Data", "Dir.Exports",
                                     "install.load.package", "package_vec"),
@@ -169,5 +169,6 @@ Data_ls <- pblapply(Sims_fs,
 Data_df <- do.call(rbind, Data_ls)
 Data_df$ID <- with(Data_df, paste(AC, DI, MU, SL, VA, pert.name, rep, sep = "-"))
 save(Data_df, file = file.path(Dir.Exports, "POPULATION_TimeStep.RData"))
+unlink(list.files(Dir.Exports, pattern = "TEMP_TStepPop_", full.names = TRUE))
 
 stopCluster(cl)
