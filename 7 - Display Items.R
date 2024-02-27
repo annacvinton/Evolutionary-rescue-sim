@@ -33,7 +33,8 @@ package_vec <- c(
   "stringr",
   "dplyr",
   "cowplot",
-  "ggpubr"
+  "ggpubr",
+  "pbapply"
 )
 sapply(package_vec, install.load.package)
 
@@ -187,11 +188,15 @@ ggsave(
 ## Time-Series Plotting ---------------------------------------------------
 ### Abundance; Conceptual ----
 # Data Loading
-load(file.path(Dir.Exports, "SummaryTimeStep.RData"))
+load(file.path(Dir.Exports, "POPULATION_TimeStep.RData"))
 Abund_df <- Data_df
 rm(Data_df)
+load(file.path(Dir.Exports, "EVORES_Metrics.RData"))
+EvoResSuc_df <- EVORES_Metrics
+rm(EVORES_Metrics)
+EvoResSuc_df$EvoRes[!EvoResSuc_df$survival] <- "Not Possible"
+EvoResSuc_df[EvoResSuc_df$pert.name >= 9, ]
 
-### Overview of Runs for Specific Perturbation ----
 # Assigning traceable IDs to abundance data
 AbundIdents <- with(Abund_df, paste(pert.name, rep, AC, DI, MU, SL, VA, sep = "_"))
 EvoResIdents <- with(EvoResSuc_df, paste(pert.name, rep, AC, DI, MU, SL, VA, sep = "_"))
@@ -205,12 +210,11 @@ Abund_df$Outcome <- str_replace_all(Abund_df$EvoRes, c("TRUE" = "Evolutionary Re
                                                        "Not Possible" = "Extinction"))
 Abund_df <- Abund_df[!is.na(Abund_df$Outcome), ]
 
+### Overview of Runs for Specific Perturbation ----
 # Subsetting for perturbation 10 due to good split of outcomes
 Abundplot_df <- Abund_df[Abund_df$pert.name == 10, ]
 Abundplot_df <- Abundplot_df[Abundplot_df$t <= 1000, ]
 Abundplot_df <- Abundplot_df[Abundplot_df$t >= 310, ]
-# message("ATTENTION ATTENTION - RE-INVESTIGATE HOW EXTINCTION IS CLASSIFIED/ASSIGNED. MAY HAVE TO CLEAN MORE FOR CRAPPED OUT RUNS")
-# Abundplot_df$n[Abundplot_df$Outcome == "Extinction" & Abundplot_df$t > 470 & Abundplot_df$n > 100] <- 0
 
 # making means and standard deviations for plotting
 Abundplot_df <- data.frame(aggregate(x = n ~ t+Outcome, data = Abundplot_df, FUN = mean),
@@ -222,93 +226,128 @@ ConceptTime_gg <- ggplot(Abundplot_df, aes(x = t, y = n, fill = Outcome, color =
   geom_point(alpha = 0.1) +
   geom_line() + 
   geom_ribbon(aes(y = n, ymin = ifelse((n - sd) < 0, 0, n - sd), ymax = n + sd, fill = Outcome), alpha = .2) + 
-  scale_fill_viridis_d() + 
-  scale_color_viridis_d() + 
+  scale_fill_manual(values = c("forestgreen", "darkred", "orange")) + 
+  scale_color_manual(values = c("forestgreen", "darkred", "orange")) + 
   ylim(c(0, NA)) +
-  theme_bw()
+  theme_bw() + labs(y = "Abundance", x = "Time")
 ConceptTime_gg
 
-message("can I somehow add the dpcut and rebcut?")
-# DipCut <- 0.1 # go down to below 10% of pre-perturbation abundance
-# RebCut <- 0.5 # bounce back to at least 50% of pre-perturbation abundance
-# 
-# print(paste(sum(is.na(EVORES_Metrics$n_minpost)), "of the", nrow(EVORES_Metrics), "potential evolutionary resuce runs had to be discarded due to data issues (mostly, runs missing writing events)"))
-# 
-# 
-# 
-# PotEvoRes1_gg <- ggplot(data = EVORES_Metrics, aes(x = perc_minpost)) + 
-#   geom_histogram(bins = 1e3) + 
-#   geom_vline(aes(xintercept = DipCut), col = "darkred") + 
-#   annotate("text", x = DipCut+0.4, y = 200, label = paste0("Everything to the left of this cutoff (", DipCut, ") is considered as \n a population crash which may be subject to evolutionary rescue")) + 
-#   theme_bw() + 
-#   labs(title = "Abundance at minimum population size post-perturbation", 
-#        x = "% of pre-perturbation abundance", y = "Count")
-# 
-# maxtest_df <- EVORES_Metrics[which(EVORES_Metrics$perc_minpost < DipCut), ]
-# PotEvoRes2_gg <- ggplot(data = maxtest_df, aes(x = perc_maxpostpre)) + 
-#   geom_histogram(bins = 1e3) + 
-#   geom_vline(aes(xintercept = RebCut), col = "forestgreen") + 
-#   annotate("text", x = RebCut+0.7, y = 75, label = paste0("Everything to the right of this cutoff (", RebCut, ") is considered as \n a population rebound indicative of evolutionary rescue")) + 
-#   theme_bw() + 
-#   labs(title = "Abundance at maximum population size following the post-perturbation minimum", 
-#        x = "% of pre-perturbation abundance", y = "Count")
-# 
-# # ## run number summaries
-# # n_totalruns <- nrow(runtimes)
-# # n_extinctruns <- sum(!runtimes$survival)
-# # n_potevoresruns <- length(na.omit(EVORES_Metrics$perc_minpost))
-# # n_dipruns <- nrow(maxtest_df)
-# # n_rebruns <- sum(na.omit(maxtest_df$perc_maxpostmin) > RebCut)
-# # 
-# # n_plot <- ggplot(data.frame(x = 1:10), aes(x = x, y = x/2)) + 
-# #   geom_point(col = "white") + 
-# #   annotate("text", x = 0, y = 5, label = paste("Total number of executed simulations =", n_totalruns), hjust = 0) + 
-# #   annotate("text", x = 0, y = 4, label = paste("Number of executed simulations ending in extinction =", n_extinctruns), hjust = 0) + 
-# #   annotate("text", x = 0, y = 3, label = paste("Number of executed simulations for which evolutionary resuce metrics can be computed =", n_potevoresruns), hjust = 0) + 
-# #   annotate("text", x = 0, y = 2, label = paste("Number of executed simulations whose populations crash hard enough =", n_dipruns), hjust = 0) + 
-# #   annotate("text", x = 0, y = 1, label = paste("Number of executed simulations who crash hard enough and rebound sufficiently =", n_rebruns), hjust = 0) + 
-# #   theme_void()
-# # 
-# # plot_save <- plot_grid(PotEvoRes1_gg, PotEvoRes2_gg)
-# # ggsave(plot_save, file = file.path(Dir.Exports, "EvoResCutOffs.jpg"), width = 32, height = 9, units = "cm")
-# # ggsave(n_plot, file = file.path(Dir.Exports, "EvoResCutOffsRuns.jpg"), width = 22, height = 9, units = "cm")
-# 
-# 
-# ## INDIVIDUAL run plotting according to evolutionary rescue or not
-# Plot_df <- merge(Data_df, save_df[,1:8])
-# Plot_df <- Plot_df[Plot_df$ID %in% save_df$ID[save_df$EvoRes], ]
-# counts <- data.frame(pert.name = names(table(save_df$pert.name[save_df$EvoRes])),
-#                      label = paste("n =", table(save_df$pert.name[save_df$EvoRes]))
-# )
-# counts$pert.name <- factor(counts$pert.name, levels = counts$pert.name)
-# 
-# 
-# ribbons_df <- aggregate(data = Plot_df, n ~ pert.name + t, FUN = mean)
-# ribbons_df$SD <- aggregate(data = Plot_df, n ~ pert.name + t, FUN = sd)$n
-# 
-# TS_gg <- ggplot(ribbons_df, aes(x = t, y = n)) + 
-#   geom_line() + 
-#   geom_ribbon(aes(y = n, ymin = n - SD, ymax = n + SD), alpha = .2) +
-#   # geom_smooth(col = "black") + 
-#   theme_bw() + 
-#   labs(x = "Time [t]", y = "Abundance [n]") + 
-#   facet_wrap(~factor(pert.name, levels = counts$pert.name), ncol = 5) + 
-#   expand_limits(y = 0) + 
-#   geom_text(
-#     data = counts,
-#     mapping = aes(x = max(ribbons_df$t), y = max(ribbons_df$n)+200, label = label),
-#     hjust   = 1,
-#     vjust   = 1
-#   )
-# TS_gg
-# ggsave(TS_gg, file = file.path(Dir.Exports, "EvoResRuns_TS.jpg"), width = 22, height = 9, units = "cm")
+ggsave(
+  ConceptTime_gg, 
+  filename = file.path(Dir.Exports, "PLOT_ConceptualTimeSeries.png"), 
+  width = 16*2, height = 9*2, units = "cm")
+
+### Visualisation of Classification Cutoffs ----
+# select single run for each outcome
+RunsID <- c(unique(Abund_df$ID[Abund_df$pert.name == 10 & Abund_df$Outcome == "Extinction"])[1],
+            unique(Abund_df$ID[Abund_df$pert.name == 10 & Abund_df$Outcome == "No Evolutionary Rescue"])[1],
+            unique(Abund_df$ID[Abund_df$pert.name == 10 & Abund_df$Outcome == "Evolutionary Rescue"])[1])
+
+# prepare runs for plotting
+Abundplot_df <- Abund_df[Abund_df$ID %in% RunsID, ]
+Abundplot_df <- Abundplot_df[Abundplot_df$t <= 1000, ]
+Abundplot_df <- Abundplot_df[Abundplot_df$t >= 310, ]
+
+# identify zones per run
+Zones <- data.frame(Lower = Abundplot_df$n[Abundplot_df$t == 460]*0.1,
+                    Upper = Abundplot_df$n[Abundplot_df$t == 460]*0.5,
+                    Outcome = unique(Abundplot_df$Outcome))
+
+# plotting
+ConceptZones_gg <- ggplot(Abundplot_df, aes(x = t, y = n)) + 
+  geom_point(alpha = 0.1) +
+  geom_line() + 
+  geom_rect(
+    data = Zones,
+    mapping = aes(xmin = 310, xmax = Inf, ymin = Lower, ymax = Upper,
+                  x = NULL, y = NULL), fill = "orange", alpha = 0.2) +
+  geom_rect(
+    data = Zones,
+    mapping = aes(xmin = 310, xmax = Inf, ymin = Upper, ymax = Inf,
+                  x = NULL, y = NULL), fill = "forestgreen", alpha = 0.2) +
+  ylim(c(0, NA )) +
+  xlim(c(310, NA )) +
+  facet_wrap(~factor(Outcome, levels = c("Extinction", "No Evolutionary Rescue", "Evolutionary Rescue")), ncol = 1) + 
+  theme_bw() + labs(y = "Abundance", x = "Time")
+ConceptZones_gg
+
+ggsave(
+  ConceptZones_gg, 
+  filename = file.path(Dir.Exports, "PLOT_ConceptualZones.png"), 
+  width = 16*2, height = 9*4, units = "cm")
 
 ### Abundance; Full Data ----
+# harmonise length of runs for plotting
+Abundplot_df <- Abund_df[Abund_df$pert.name >= 9, ]
+Abundplot_df <- Abundplot_df[Abundplot_df$t <= 1000, ]
+Abundplot_df <- Abundplot_df[Abundplot_df$t >= 310, ]
+
+# establish band ranges
+Abundplot_df <- data.frame(
+  aggregate(x = n ~ t+Outcome+pert.name+AC+DI+MU+SL+VA, data = Abundplot_df, FUN = mean),
+  sd = aggregate(x = n ~ t+Outcome+pert.name+AC+DI+MU+SL+VA, data = Abundplot_df, FUN = sd)[,3])
+Abundplot_df$sd[is.na(Abundplot_df$sd)] <- 0
+colnames(Abundplot_df)[3:8] <- c("Perturbation Magnitude",
+                                   "Spatial Autocorrelation", "Dispersal", "Mutation",
+                                   "Spatial Slope", "Spatial Variation")
+
+
+# plotting
+## characteristics for data subsetting
+AllChars <- Abundplot_df[
+  !duplicated(Abundplot_df[, c("Perturbation Magnitude", "Spatial Autocorrelation", "Spatial Slope", "Spatial Variation")]), 
+  c("Perturbation Magnitude", "Spatial Autocorrelation", "Spatial Slope", "Spatial Variation")]
+AllChars <- AllChars[
+  with(AllChars, 
+       order(`Perturbation Magnitude`, 
+             `Spatial Autocorrelation`,
+             `Spatial Slope`,
+             `Spatial Variation`
+             )),
+]
+
+FullTime_ls <- pblapply(1:nrow(AllChars), FUN = function(x){
+  Characteristics <- AllChars[x,]
+  Subset <- which(
+    apply(Abundplot_df[, c("Perturbation Magnitude", "Spatial Autocorrelation", "Spatial Slope", "Spatial Variation")], 
+          MARGIN = 1, FUN = function(y){
+            sum(y == Characteristics)
+          }) == 4)
+  FullTime_gg <- ggplot(Abundplot_df[Subset,], aes(x = t, y = n, 
+                                                   fill = factor(Outcome, levels = c("Extinction", "No Evolutionary Rescue", "Evolutionary Rescue")), 
+                                                   color = factor(Outcome, levels = c("Extinction", "No Evolutionary Rescue", "Evolutionary Rescue")))) + 
+    geom_point(alpha = 0.1) +
+    geom_line() + 
+    geom_ribbon(aes(y = n, ymin = ifelse((n - sd) < 0, 0, n - sd), ymax = n + sd, fill = Outcome), alpha = .2) + 
+    scale_fill_manual(values = c("darkred", "orange", "forestgreen"), name = "Outcome") + 
+    scale_color_manual(values = c("darkred", "orange", "forestgreen"), name = "Outcome") + 
+    facet_grid(Dispersal ~ Mutation, labeller = label_both) + 
+    ylim(c(0, NA)) +
+    theme_bw() + labs(y = "Abundance", x = "Time", 
+                      title = paste("Perturbation = ", Characteristics[1],
+                                    " ; Spatial Autocorrelation = ", Characteristics[2],
+                                    " ; Spatial Slope = ", Characteristics[3],
+                                    " ; Spatial Variation = ", Characteristics[4])) + 
+    theme(legend.position = "bottom")
+  FullTime_gg
+})
+pdf(file.path(Dir.Exports, "PLOT_FullTimeSeries.pdf"), width = 11, height = 8)
+for(i in 1:length(FullTime_ls)){
+  print(FullTime_ls[[i]])
+}
+dev.off()
+
 
 ### Other Population Metrics; Full Data ----
 
 
-## Environmental Parameterisation and Actual Environmental Values ---------
+## Environment Parameters  ------------------------------------------------
+
+### Environmental Parameterisation and Actual Environmental Values --------
+
+### Distribution Comparisons ----
+#### Non-Spatially Explicit ----
+#### Spatially Explicit ----
 
 ## Analyses Inputs and Outcomes -------------------------------------------
 ### Survival or Extinction ----
