@@ -443,7 +443,6 @@ if(file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))){
 
 ## Earth-Mover Distance ---------------------------------------------------
 order <- names(Enviro_Cells_ls)#[start_n:length(Enviro_Cells_ls)]
-
 nC <- ifelse(length(order)>parallel::detectCores(), parallel::detectCores(), length(order))
 cl <- makeCluster(nC)
 clusterExport(cl = cl, varlist = c("Dir.Data", "Dir.Exports", "install.load.package", "package_vec", "%nin%",
@@ -452,7 +451,7 @@ clusterExport(cl = cl, varlist = c("Dir.Data", "Dir.Exports", "install.load.pack
 clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
 
 Overlap_ls <- pblapply(X = order,
-                       # cl = cl,
+                       cl = cl,
                        FUN = function(x){
                          # x <- order[2]
                          
