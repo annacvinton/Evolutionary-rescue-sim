@@ -467,7 +467,11 @@ for(i in 1:length(OV_Dens_gg)){
 dev.off()
 
 #### Spatially Explicit ----
-
+load(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))
+DISTRIBUTIONS_Spatial <- DISTRIBUTIONS_Spatial[["Summary_df"]]
+rownames(DISTRIBUTIONS_Spatial) <- c()
+head(DISTRIBUTIONS_Spatial)
+stop("Continue here")
 
 ## Analyses Inputs and Outcomes -------------------------------------------
 ### Survival or Extinction ----
