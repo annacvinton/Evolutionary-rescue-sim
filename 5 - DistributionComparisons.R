@@ -168,6 +168,8 @@ if(file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData"))){
                                    SL = rep(SL, nrow(comparison)),
                                    Pert = rep(z, nrow(comparison)),
                                    rep = rep(b, nrow(comparison)),
+                                   MU = rep(MU, nrow(comparison)),
+                                   DI = rep(DI, nrow(comparison)),
                                    OV_Dens = OVERLAP, # shared area between both density curves divided by their combined total area 
                                    OV_Perc = OV_perc, # percentage of trait values who fall within the range of the environment values
                                    Envir = comparison$Envir,
