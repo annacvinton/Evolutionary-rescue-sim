@@ -35,7 +35,8 @@ package_vec <- c(
   "cowplot",
   "ggpubr",
   "pbapply",
-  "zoo"
+  "zoo",
+  "ggpubr"
 )
 sapply(package_vec, install.load.package)
 
@@ -413,7 +414,60 @@ ggsave(SpatParam_gg, filename = file.path(Dir.Exports, "PLOT_SpatialParameterisa
 
 ### Distribution Comparisons ----
 #### Non-Spatially Explicit ----
+load(file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData"))
+DISTRIBUTIONS_NonSpatial
+DISTRIBUTIONS_NonSpatial$Comparisons <- paste(
+  paste("[Environment]", DISTRIBUTIONS_NonSpatial$Envir), 
+  "vs.", 
+  paste("[Individuals]", DISTRIBUTIONS_NonSpatial$Indivs)
+)
+DISTRIBUTIONS_NonSpatial$Comparisons <- 
+  factor(DISTRIBUTIONS_NonSpatial$Comparisons,
+         levels = c(
+           "[Environment] Pre vs. [Individuals] Pre",
+           "[Environment] Post vs. [Individuals] PostMin",
+           "[Environment] Post vs. [Individuals] PostMax"
+         ))
+DISTRIBUTIONS_NonSpatial <- DISTRIBUTIONS_NonSpatial[DISTRIBUTIONS_NonSpatial$Pert>=9, ]
+
+OV_Dens_gg <- pblapply(sort(unique(DISTRIBUTIONS_NonSpatial$AC)), FUN = function(AC_iter){
+  AC_df <- DISTRIBUTIONS_NonSpatial[DISTRIBUTIONS_NonSpatial$AC == AC_iter,]
+  SL_ls <- lapply(sort(unique(DISTRIBUTIONS_NonSpatial$SL)), FUN = function(SL_iter){
+    SL_df <- AC_df[AC_df$SL == SL_iter,]
+    VA_ls <- lapply(sort(unique(DISTRIBUTIONS_NonSpatial$VA)), FUN = function(VA_iter){
+      VA_df <- SL_df[SL_df$VA == VA_iter,]
+      ggplot(VA_df, aes(y = OV_Dens, x = Pert,
+                        fill = Comparisons,
+                        col = Comparisons)) + 
+        geom_point(size = 3) + 
+        geom_smooth(method="loess") + 
+        labs(y = "Overlap of Density Distributions", x = "Perturbation Magnitude",
+             title = paste(
+               "Autocorrelation =", AC_iter,
+               "; Slope =", SL_iter,
+               "; Variation =", VA_iter
+             )) + 
+        facet_grid(DI ~ MU, labeller = label_both) + 
+        theme_bw() + theme(legend.position = "bottom") + ylim(c(0,1)) + xlim(c(9,16))
+    })
+    cowplot::plot_grid(
+      cowplot::plot_grid(plotlist = lapply(VA_ls, FUN = function(x){
+        x+theme(legend.position = "none")
+      }), ncol = 3), 
+      as_ggplot(get_legend(VA_ls[[1]])), ncol = 1, rel_heights = c(1, 0.1)
+    )
+  })
+  cowplot::plot_grid(plotlist = SL_ls, ncol = 1)
+})
+pdf(file.path(Dir.Exports, "PLOT_NonSpatialOverlapDensity.pdf"), 
+    width = 16, height = 16)
+for(i in 1:length(OV_Dens_gg)){
+  print(OV_Dens_gg[[i]])
+}
+dev.off()
+
 #### Spatially Explicit ----
+
 
 ## Analyses Inputs and Outcomes -------------------------------------------
 ### Survival or Extinction ----
