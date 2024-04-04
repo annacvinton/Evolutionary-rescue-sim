@@ -88,6 +88,8 @@ evoressuc_ls <- pblapply(1:nrow(noext),
                                perc_maxpostmin = NA,
                                perc_maxpostpre = NA,
                                survival = NA,
+                               SuffDip = NA,
+                               SuffReb = NA,
                                EvoRes = NA
                              )
                            }else{
@@ -136,13 +138,17 @@ evoressuc_ls <- pblapply(1:nrow(noext),
                                perc_maxpostmin = maxpost_df$ChangePost,
                                perc_maxpostpre = maxpost_df$ChangePre,
                                survival = TRUE,
+                               SuffDip = FALSE,
+                               SuffReb = FALSE,
                                EvoRes = FALSE
                              )
                              
                              ## classification
                              DipCut <- 0.1 # go down to below 10% of pre-perturbation abundance
                              RebCut <- 0.5 # bounce back to at least 50% of pre-perturbation abundance
-                             bind_df$EvoRes <- (bind_df$perc_minpost < DipCut & bind_df$perc_maxpostpre > RebCut)
+                             bind_df$SuffDip <- bind_df$perc_minpost < DipCut
+                             bind_df$SuffReb <- bind_df$perc_maxpostpre >= RebCut
+                             bind_df$EvoRes <- (bind_df$SuffDip+bind_df$SuffReb == 2)
                            }
                            bind_df
                          })
