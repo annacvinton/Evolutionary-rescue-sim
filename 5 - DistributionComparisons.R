@@ -388,7 +388,7 @@ if(file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))){
                                                                                               VA = VA,
                                                                                               SL = SL,
                                                                                               Pert = z,
-                                                                                              rep = b, 
+                                                                                              rep = b,
                                                                                               ## best environmental cell
                                                                                               Best_dist_mean = ifelse(is.null(mean(Best_df$Best_dist)), NA, mean(Best_df$Best_dist)),
                                                                                               Best_dist_sd = ifelse(is.null(sd(Best_df$Best_dist)), NA, sd(Best_df$Best_dist)),
@@ -438,6 +438,15 @@ if(file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))){
                          }) # Overlap_ls loop
   DISTRIBUTIONS_Spatial <- list(Summary_df = do.call(rbind, lapply(Overlap_ls, "[[", "Summary_df")),
                                 RasterDiff = lapply(Overlap_ls, "[[", "RasterDiff"))
+  IDChars <- pblapply(rownames(DISTRIBUTIONS_Spatial$Summary_df), FUN = function(y){
+    Characteristics <- as.numeric(unlist(regmatches(unlist(strsplit(x = y, split = "_")),
+                                                    gregexpr("[[:digit:]]+\\.*[[:digit:]]*",
+                                                             unlist(strsplit(x = y, split = "_"))))
+    ))
+    data.frame(DI = Characteristics[2],
+               MU = Characteristics[3])
+  })
+  DISTRIBUTIONS_Spatial$Summary_df <- cbind(DISTRIBUTIONS_Spatial$Summary_df, do.call(rbind, IDChars)) 
   save(DISTRIBUTIONS_Spatial, file = file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))
   unlink(list.files(Dir.Exports, pattern = "TEMP_", full.names = TRUE))
   stopCluster(cl)
