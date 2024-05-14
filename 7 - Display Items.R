@@ -470,10 +470,145 @@ dev.off()
 load(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))
 DISTRIBUTIONS_Spatial <- DISTRIBUTIONS_Spatial[["Summary_df"]]
 rownames(DISTRIBUTIONS_Spatial) <- c()
-head(DISTRIBUTIONS_Spatial)
-stop("Continue here")
+DISTRIBUTIONS_Spatial$Comparisons <- paste(
+  paste("[Environment]", DISTRIBUTIONS_Spatial$Envir), 
+  "vs.", 
+  paste("[Individuals]", DISTRIBUTIONS_Spatial$Indivs)
+)
+DISTRIBUTIONS_Spatial$Comparisons <- 
+  factor(DISTRIBUTIONS_Spatial$Comparisons,
+         levels = c(
+           "[Environment] Pre vs. [Individuals] Pre",
+           "[Environment] Post vs. [Individuals] PostMin",
+           "[Environment] Post vs. [Individuals] PostMax"
+         ))
+DISTRIBUTIONS_Spatial <- DISTRIBUTIONS_Spatial[DISTRIBUTIONS_Spatial$Pert>=9, ]
+
+DISTRIBUTIONS_Spatial$EMD2D <- abs(DISTRIBUTIONS_Spatial$EMD2D)
+
+plot_df <- DISTRIBUTIONS_Spatial[DISTRIBUTIONS_Spatial$EMD2D <= quantile(DISTRIBUTIONS_Spatial$EMD2D, 0.95), ]
+
+
+stop("Think I need Anna to come up with interesting questions to visualise here:")
+Var <- "Weighted_maladap_mean"
+
+plot_iter <- DISTRIBUTIONS_Spatial
+colnames(plot_iter)[colnames(plot_iter) == Var] <- "Var"
+
+ggplot(plot_iter, aes(y = Var, x = factor(Pert))) + 
+  geom_boxplot() + 
+  labs(y = Var, x = "Perturbation Magnitude") + 
+  facet_grid(DI ~ MU+Comparisons, labeller = label_both) + 
+  theme_bw()
+
+MU.comps <- list(c("0", "1"))
+MU_ggs <- lapply(levels(DISTRIBUTIONS_Spatial$Comparisons)[-1], FUN = function(x){
+  ggplot(plot_iter[plot_iter$Comparisons == x, ], aes(y = Var, x = factor(MU))) + 
+    geom_boxplot() + 
+    stat_compare_means(comparisons = MU.comps) + 
+    labs(y = Var, x = "Mutation (No, Yes)", title = x) + 
+    facet_grid(DI ~ Pert, labeller = label_both) + 
+    theme_bw()
+})
+MU_ggs <- plot_grid(plotlist = MU_ggs, ncol = 1) # when dispersal is lower (1.5), then Mutation is the only way to survive past Pert 13. At Pert13, Mutation at lower dispersal leads to less maladaptation
+
+
+AC_ggs <- lapply(levels(DISTRIBUTIONS_Spatial$Comparisons)[-1], FUN = function(x){
+ggplot(plot_iter[plot_iter$Comparisons == x, ], aes(y = Var, x = AC, fill = factor(Pert))) + 
+    geom_point() + 
+    geom_smooth(method="loess") + 
+    labs(y = Var, x = "Spatial Autocorrelation", title = x) + 
+    facet_grid(DI ~ MU, labeller = label_both) + 
+    theme_bw()
+})
+AC_ggs <- plot_grid(plotlist = AC_ggs, ncol = 1) # spatial autocorrelation may not 
+
 
 ## Analyses Inputs and Outcomes -------------------------------------------
+load(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))
+DISTRIBUTIONS_Spatial <- DISTRIBUTIONS_Spatial[["Summary_df"]]
+rownames(DISTRIBUTIONS_Spatial) <- c()
+DISTRIBUTIONS_Spatial$Comparisons <- paste(
+  paste("[Environment]", DISTRIBUTIONS_Spatial$Envir), 
+  "vs.", 
+  paste("[Individuals]", DISTRIBUTIONS_Spatial$Indivs)
+)
+DISTRIBUTIONS_Spatial$Comparisons <- 
+  factor(DISTRIBUTIONS_Spatial$Comparisons,
+         levels = c(
+           "[Environment] Pre vs. [Individuals] Pre",
+           "[Environment] Post vs. [Individuals] PostMin",
+           "[Environment] Post vs. [Individuals] PostMax"
+         ))
+DISTRIBUTIONS_Spatial <- DISTRIBUTIONS_Spatial[DISTRIBUTIONS_Spatial$Pert>=9, ]
+
+load(file.path(Dir.Exports, "EVORES_Metrics.RData"))
+EvoResSuc_df <- EVORES_Metrics
+EvoResSuc_df <- EvoResSuc_df[EvoResSuc_df$pert.name >= 9, ]
+EvoResSuc_df$EvoRes[!EvoResSuc_df$SuffDip] <- "Insufficient Population Crash"
+
+
+FullData_df <- base::merge(EvoResSuc_df, DISTRIBUTIONS_Spatial, all.x = TRUE)
+
 ### Survival or Extinction ----
+Surv_Sum <- aggregate(
+  survival ~ MU+DI+AC+SL+VA+pert.name, FUN = sum,
+  data = FullData_df[!duplicated(FullData_df$ID), ])
+Surv_Sum$Runs <- aggregate(
+  survival ~ MU+DI+AC+SL+VA+pert.name, FUN = length,
+  data = FullData_df[!duplicated(FullData_df$ID), ])$survival
+Surv_Sum$PercSurv <- Surv_Sum$survival/Surv_Sum$Runs *100
+
+MU.comps <- list(c("0", "1"))
+Surv_MU_gg <- ggplot(Surv_Sum, 
+       aes(x = factor(pert.name), y = PercSurv, 
+           fill = factor(MU))) + 
+  geom_boxplot() + 
+  stat_compare_means(aes(group = factor(MU)), label = "p.signif") + 
+  # geom_label(aes(label = Runs)) + 
+  labs(y = "Rate of Survival [%]", x = "Perturbation Magnitude", title = "", fill = "Mutation") + 
+  facet_grid(VA ~ SL, labeller = label_both) +
+  theme_bw()
+
+DI.comps <- list(c("1.5", "2"))
+Surv_DI_gg <- ggplot(Surv_Sum, 
+                     aes(x = factor(pert.name), y = PercSurv, 
+                         fill = factor(DI))) + 
+  geom_boxplot() + 
+  stat_compare_means(aes(group = factor(DI)), label = "p.signif") + 
+  # geom_label(aes(label = Runs)) + 
+  labs(y = "Rate of Survival [%]", x = "Perturbation Magnitude", title = "", fill = "Dispersal") + 
+  facet_grid(VA ~ SL, labeller = label_both) +
+  theme_bw()
+
+SurvPerc_Pert_gg <- ggplot(Surv_Sum, 
+       aes(x = factor(pert.name), y = AC, 
+           fill = PercSurv)) + 
+  geom_tile() +
+  scale_fill_viridis_c(option = "F", direction = 1, name = "Survival [%]") + 
+  labs(x = "Perturbation Magnitude", y = "Spatial Autocorrelation",
+       title = "Perturbation Magnitude Leads to abrupt changes in survival likelihood",
+       subtitle = "Notice how this abrupt change sets in at higher perturbation magnitudes when mutation is allowed and dispersal and slope are higher") + 
+  theme_bw() + 
+  facet_grid(MU+VA ~ DI+SL, labeller = label_both) +
+  theme(legend.position = "bottom",
+        legend.key.width = unit(dev.size()[1] / 8, "inches"),
+        legend.key.height = unit(dev.size()[1] / 20, "inches"))
+
+SurvPerc_MUDI_gg <- ggplot(Surv_Sum, 
+                           aes(x = factor(MU), y = factor(DI), 
+                               fill = PercSurv)) + 
+  geom_tile() +
+  scale_fill_viridis_c(option = "F", direction = 1, name = "Survival [%]") + 
+  labs(x = "Mutation", y = "Dispersal",
+       title = "Mutation and dispersal drive survival likelihood",
+       subtitle = "") + 
+  theme_bw() + 
+  facet_grid(pert.name+VA ~ AC+SL, labeller = label_both) +
+  theme(legend.position = "bottom",
+        legend.key.width = unit(dev.size()[1] / 8, "inches"),
+        legend.key.height = unit(dev.size()[1] / 20, "inches"))
+SurvPerc_MUDI_gg
+
 ### Survival or Evolutionary Rescue ----
 ### Characteristics of Evolutionary Rescue ----
