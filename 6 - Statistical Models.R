@@ -303,6 +303,32 @@ BiEvoRes_ls <- lapply(1:nrow(ModelCombs), FUN = function(iter){
 #' Might want to run one full interaction model
 #' Maybe run initially for MU = 0 and DI = 2 as well as MU = 1 and DI = 1.5?
 
+
+if(file.exists(file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))){
+  load(file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))
+}else{
+  BiEvoRes_MULTILEVEL_brm <- brm(
+    ## model formulae
+      # logistic outcome
+    bf(EvoRes ~ postmin_u_sd, family = bernoulli()) +  
+      # post-pert population metrics
+    bf(postmin_u_sd ~ 0 + factor(MU) * abs(SL-1) * DI + pre_u_sd, family = hurdle_gamma()) +
+      # pre-pert population metrics
+    bf(pre_u_sd ~ 0 + factor(MU) * abs(SL-1) * DI * AC * VA)
+    , 
+    ## data
+    data = EVORES_Metrics,
+    ## settings for run
+    chains = 4,
+    cores = parallel::detectCores(),
+    iter = 1e4,
+    warmup = 3e3,
+    seed = 42)
+  save(BiEvoRes_MULTILEVEL_brm, file = file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))
+}
+LogisticModelDiagnostics(BiEvoRes_MULTILEVEL_brm)
+
+
 # Combine the formulas into a single model
 multi_level_model2 <- brm(
   # model formulae
