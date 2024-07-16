@@ -242,12 +242,34 @@ BiSurv_ls <- lapply(1:nrow(ModelCombs), FUN = function(iter){
 })
 
 ## Evolutionary Rescue ----------------------------------------------------
+### Logistic Regression ---------------------------
 Dir.LogiEvoRes <- file.path(Dir.Exports, "EvoRes_Logistic")
 if(!dir.exists(Dir.LogiEvoRes)){dir.create(Dir.LogiEvoRes)}
 
-### Logistic Regression ---------------------------
 EVORES_Metrics <- MODEL_Metrics[MODEL_Metrics$EvoRes != "Insufficient Population Crash", ]
 EVORES_Metrics$EvoRes <- as.numeric(as.logical(EVORES_Metrics$EvoRes))
+
+
+
+## trial for mixture model to resolve bimodal outcome, adapted from https://discourse.mc-stan.org/t/modeling-bimodal-duration-data-with-categorical-predictors-with-brms/28281/2
+mix <- mixture(gaussian, gaussian) #exgaussian
+prior <- c(
+prior(normal(0, 1000), Intercept, dpar = mu1),
+prior(normal(1000, 1000), Intercept, dpar = mu2))
+  
+myBrmsModel <- brm(
+  bf(postmin_u_sd ~ pert.name + factor(MU) * abs(SL-1) * DI + pre_u_sd),
+  data = MODEL_Metrics,
+  family = mix,
+  prior = prior,
+  control = list(adapt_delta = 0.99),
+  init = 0,
+  iter = 5000,
+  chains = 4,
+  cores = 4)
+
+pp_check(myBrmsModel, ndraws = 1e2)
+
 
 #### Model Fitting ----
 ##### SINGLE MODEL
