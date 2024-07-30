@@ -252,19 +252,19 @@ EVORES_Metrics$EvoRes <- as.numeric(as.logical(EVORES_Metrics$EvoRes))
 
 
 ## trial for mixture model to resolve bimodal outcome, adapted from https://discourse.mc-stan.org/t/modeling-bimodal-duration-data-with-categorical-predictors-with-brms/28281/2
-mix <- mixture(gaussian, gaussian) #exgaussian
+mix <- mixture(hurdle_gamma, exgaussian)
 prior <- c(
-prior(normal(0, 1000), Intercept, dpar = mu1),
-prior(normal(1000, 1000), Intercept, dpar = mu2))
+  prior(normal(0, 10), Intercept, dpar = mu1),
+  prior(normal(100, 100), Intercept, dpar = mu2))
   
 myBrmsModel <- brm(
-  bf(postmin_u_sd ~ pert.name + factor(MU) * abs(SL-1) * DI + pre_u_sd),
-  data = MODEL_Metrics,
+  bf(postmin_u_sd ~ pert.name + abs(SL-1) + AC + pre_u_sd),
+  data = EVORES_Metrics[EVORES_Metrics$MU == 0 & EVORES_Metrics$DI == 2,],
   family = mix,
   prior = prior,
   control = list(adapt_delta = 0.99),
   init = 0,
-  iter = 5000,
+  iter = 1e4,
   chains = 4,
   cores = 4)
 
