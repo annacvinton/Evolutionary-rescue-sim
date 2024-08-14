@@ -43,7 +43,21 @@ sapply(package_vec, install.load.package)
 ## Functionality ----------------------------------------------------------
 `%nin%` <- Negate(`%in%`) # a function for negation of %in% function
 
-LogisticModelDiagnostics <- function(Model_brm){
+LogisticModelDiagnostics <- function(Model_brm, title = "NULL TITLE"){
+  ### Title ----
+  title <- ggdraw() + 
+    draw_label(
+      title,
+      fontface = 'bold',
+      x = 0,
+      hjust = 0
+    ) +
+    theme(
+      # add margin on the left of the drawing canvas,
+      # so title is aligned with left edge of first plot
+      plot.margin = margin(0, 0, 0, 7)
+    )
+  
   ### Model Diagnostics ----
   # model diagnostics
   # summary(Model_brm) # all coefficients significant
@@ -52,7 +66,7 @@ LogisticModelDiagnostics <- function(Model_brm){
   }
   # plot(Model_brm) # everything converged
   # neff_ratio(Model_brm) # looks alright
-  ppcheck_gg <- pp_check(Model_brm, type = "bars") # looks alright
+  ppcheck_gg <- pp_check(Model_brm, type = "bars", ndraws = 42)
   
   ### Model Outputs ----
   # #### Predicted survival
@@ -100,7 +114,92 @@ LogisticModelDiagnostics <- function(Model_brm){
     labs(x = "Log Odds / Log Odds Change", y = "Coefficient")
   
   #### Combined Plots
-  print(cowplot::plot_grid(ppcheck_gg, Coeffplots))
+  cowplot::plot_grid(
+    title,
+    cowplot::plot_grid(ppcheck_gg, Coeffplots),
+    rel_heights = c(0.1, 1), ncol = 1
+    )
+}
+
+MultiLevelModelDiagnostics <- function(Model_brm, type = c("cat", "cont", "cont")){
+  ### Model Diagnostics ----
+  # model diagnostics
+  # summary(Model_brm) # all coefficients significant
+  if(any(rhat(Model_brm) > 1.05)){# everything converged
+    message("Some rhat values are worryingly large")
+  }
+  
+  plot_coeffs <- Model_brm |> 
+    gather_draws(`^b_.*`, regex = TRUE) |>
+    mutate(.panel = ifelse((grepl(.variable, pattern = "Intercept") | grepl(.variable, pattern = "pert.name")),
+                           "Intercept", "Coefficient")) 
+  plot_coeffs$.variable <- gsub(plot_coeffs$.variable, pattern = "mu1_", replacement = "")
+  plot_coeffs$.variable <- gsub(plot_coeffs$.variable, pattern = "mu2_", replacement = "")
+  ## significance of coefficients
+  plot_coeffs$.value
+  
+  Quantiles <- aggregate(.value~.variable, data = plot_coeffs, FUN = quantile, probs = c(0.05, 0.95))
+  Quantiles$signif <- abs(sign(Quantiles$.value[,1]) + sign(Quantiles$.value[,2])) == 2
+  plot_coeffs$signif <- Quantiles$signif[match(gsub(plot_coeffs$.variable, pattern = "b_", replacement = ""), Quantiles$.variable)]
+  ## define plotting panel names
+  plot_coeffs$.panel[
+    which(plot_coeffs$.variable %in% unique(grep(paste(c("MU", "DI"),collapse = "|"), plot_coeffs$.variable, value = TRUE))) 
+  ] = "Population"
+  plot_coeffs$.panel[
+    which(plot_coeffs$.variable %in% unique(grep(paste(c("AC", "SL", "VA"),collapse = "|"), plot_coeffs$.variable, value = TRUE)))
+  ] = "Environment"
+  plot_coeffs$.variable <- gsub(plot_coeffs$.variable, pattern = "b_", replacement = "")
+  plot_coeffs$.variable[which(plot_coeffs$.variable == "pert.name")] <- "PM"
+  ## define order of coefficients in plotting
+  varfacs <- sort(unique(plot_coeffs$.variable))
+  varfacs <- c("Intercept", "PM", varfacs[!(varfacs %in% c("Intercept", "PM"))])
+  
+  plots_ls <- lapply(1:length(Model_brm[["formula"]][["responses"]]),
+                     FUN = function(x){
+                       print(paste("Hierarchy Layer", x))
+                       
+                       if(type[x] == "cat"){
+                         pp_gg <- pp_check(Model_brm, ndraws = 50,
+                                           resp = Model_brm[["formula"]][["responses"]][x],
+                                           type = "bars") 
+                       }else{
+                         pp_gg <- pp_check(Model_brm, ndraws = 50,
+                                           resp = Model_brm[["formula"]][["responses"]][x])
+                       }
+                       
+                       plot_iter <- plot_coeffs[startsWith(plot_coeffs$.variable, Model_brm[["formula"]][["responses"]][x]), ]
+                       plot_iter$.variable <- gsub(pattern = paste0(Model_brm[["formula"]][["responses"]][x], "_"), 
+                                                   replacement = "", plot_iter$.variable)
+                       coeff_gg <- plot_iter |> 
+                         ggplot(aes(x = .value, 
+                                    y = factor(.variable, levels = unique(rev(gsub(pattern = paste0(Model_brm[["formula"]][["responses"]][x], "_"),
+                                                                                   replacement = "", varfacs)))), 
+                                    fill = signif)) +
+                         geom_vline(xintercept = 0) + 
+                         stat_halfeye(normalize = "xy") + 
+                         facet_wrap(~ factor(.panel, levels = c("Intercept", "Population", "Environment", "Coefficient")),
+                                    scales = "free",
+                                    ncol = 1) +
+                         theme_bw() + theme(legend.position = "none") + 
+                         labs(x = "Log Odds / Log Odds Change", y = "Coefficient")
+                       
+                       gg_grid <- cowplot::plot_grid(
+                         ggdraw() + 
+                           draw_label(
+                             Model_brm[["formula"]][["responses"]][x],
+                             fontface = 'bold',
+                             x = 0,
+                             hjust = 0
+                           ) +
+                           theme(
+                             # add margin on the left of the drawing canvas,
+                             # so title is aligned with left edge of first plot
+                             plot.margin = margin(0, 0, 0, 7)
+                           ),
+                         cowplot::plot_grid(pp_gg, coeff_gg, rel_widths = c(0.4, 0.6)),
+                         rel_heights = c(0.1, 1), ncol = 1)
+                       print(gg_grid)
+                     }) 
 }
 
 # DATA ====================================================================
@@ -191,85 +290,31 @@ Dir.LogiSurv <- file.path(Dir.Exports, "Survival_Logistic")
 if(!dir.exists(Dir.LogiSurv)){dir.create(Dir.LogiSurv)}
 
 ### Model Fitting ----
-## split by Mutation, Dispersal, and perturbation magnitude, because of the questions we ask
-## can I average model coefficients
-## expand.grid(unique(EVORES_Metrics$pert.name), unique(EVORES_Metrics$DI), c(0,1))
-## t-tests between posterior samples against splitting factors
-## separate model of all data just without MU and DI (split by these)
-
 ##### SINGLE MODEL
 if(file.exists(file.path(Dir.LogiSurv, "BiSurv_brm.RData"))){
   load(file.path(Dir.LogiSurv, "BiSurv_brm.RData"))
 }else{
-  BiSurv_brm <- brm(formula = survival ~ pert.name + SL + DI * MU,
-                            data = MODEL_Metrics,
-                            family = bernoulli(link = "logit"),
-                            warmup = 3e3,
-                            iter = 1e4,
-                            chains = 4,
-                            cores = 4,
-                            seed = 42)
+  BiSurv_brm <- brm(formula = survival ~ pert.name + SL + DI * factor(MU),
+                    data = MODEL_Metrics,
+                    family = bernoulli(link = "logit"),
+                    warmup = 3e3,
+                    iter = 1e4,
+                    chains = 4,
+                    cores = 4,
+                    seed = 42)
   save(BiSurv_brm, file = file.path(Dir.LogiSurv, "BiSurv_brm.RData"))
 }
 BiSurvFinal_brm <- BiSurv_brm
-LogisticModelDiagnostics(BiSurvFinal_brm)
-
-##### SPLITTING
-ModelCombs <- with(na.omit(MODEL_Metrics), expand.grid(unique(DI), unique(MU)))
-colnames(ModelCombs) <- c("DI", "MU")
-
-BiSurv_ls <- lapply(1:nrow(ModelCombs), FUN = function(iter){
-  FNAME <- file.path(Dir.LogiSurv, paste0("BiSurv_brm_DI-", ModelCombs$DI[iter], "_MU-", ModelCombs$MU[iter],".RData"))
-  if(file.exists(FNAME)){
-    load(FNAME)
-  }else{
-    BiSurv_brm <- brm(formula = survival ~ pert.name + VA * AC * SL,
-                        data = MODEL_Metrics[
-                          (MODEL_Metrics$DI == ModelCombs$DI[iter] &
-                             MODEL_Metrics$MU == ModelCombs$MU[iter]),
-                        ],
-                        family = bernoulli(link = "logit"),
-                        warmup = 3e3,
-                        iter = 1e4,
-                        chains = 4,
-                        cores = 4,
-                        seed = 42)
-    # Sys.sleep(60*30)
-    save(BiSurv_brm, file = FNAME)
-  }
-  LogisticModelDiagnostics(BiSurv_brm)
-  BiSurv_brm
-})
+LogisticModelDiagnostics(BiSurvFinal_brm, title = "Logistic Survival Model")
 
 ## Evolutionary Rescue ----------------------------------------------------
 ### Logistic Regression ---------------------------
 Dir.LogiEvoRes <- file.path(Dir.Exports, "EvoRes_Logistic")
 if(!dir.exists(Dir.LogiEvoRes)){dir.create(Dir.LogiEvoRes)}
 
+## analyse only simulations with sufficient crash
 EVORES_Metrics <- MODEL_Metrics[MODEL_Metrics$EvoRes != "Insufficient Population Crash", ]
 EVORES_Metrics$EvoRes <- as.numeric(as.logical(EVORES_Metrics$EvoRes))
-
-
-
-## trial for mixture model to resolve bimodal outcome, adapted from https://discourse.mc-stan.org/t/modeling-bimodal-duration-data-with-categorical-predictors-with-brms/28281/2
-mix <- mixture(hurdle_gamma, exgaussian)
-prior <- c(
-  prior(normal(0, 10), Intercept, dpar = mu1),
-  prior(normal(100, 100), Intercept, dpar = mu2))
-  
-myBrmsModel <- brm(
-  bf(postmin_u_sd ~ pert.name + abs(SL-1) + AC + pre_u_sd),
-  data = EVORES_Metrics[EVORES_Metrics$MU == 0 & EVORES_Metrics$DI == 2,],
-  family = mix,
-  prior = prior,
-  control = list(adapt_delta = 0.99),
-  init = 0,
-  iter = 1e4,
-  chains = 4,
-  cores = 4)
-
-pp_check(myBrmsModel, ndraws = 1e2)
-
 
 #### Model Fitting ----
 ##### SINGLE MODEL
@@ -287,7 +332,7 @@ if(file.exists(file.path(Dir.LogiEvoRes, "BiEvoRes_brm.RData"))){
   save(BiEvoRes_brm, file = file.path(Dir.LogiEvoRes, "BiEvoRes_brm.RData"))
 }
 BiEvoResFinal_brm <- BiEvoRes_brm
-LogisticModelDiagnostics(BiEvoResFinal_brm)
+LogisticModelDiagnostics(BiEvoResFinal_brm, title = "Logistic Evolutionary Rescue Model")
 
 ##### SPLITTING
 ModelCombs <- with(na.omit(EVORES_Metrics), expand.grid(unique(DI), unique(MU)))
@@ -301,7 +346,7 @@ BiEvoRes_ls <- lapply(1:nrow(ModelCombs), FUN = function(iter){
     BiEvoRes_brm <- brm(formula = EvoRes ~ pert.name + VA * AC * abs(SL-1),
                         data = EVORES_Metrics[
                           (EVORES_Metrics$DI == ModelCombs$DI[iter] &
-                            EVORES_Metrics$MU == ModelCombs$MU[iter]),
+                             EVORES_Metrics$MU == ModelCombs$MU[iter]),
                         ],
                         family = bernoulli(link = "logit"),
                         warmup = 3e3,
@@ -312,31 +357,51 @@ BiEvoRes_ls <- lapply(1:nrow(ModelCombs), FUN = function(iter){
     # Sys.sleep(60*30)
     save(BiEvoRes_brm, file = FNAME)
   }
-  LogisticModelDiagnostics(BiEvoRes_brm)
+  plot <- LogisticModelDiagnostics(BiEvoRes_brm,
+                           title = paste(paste(colnames(ModelCombs), ModelCombs[iter,], sep = " = "), collapse = " & "))
+  print(plot)
   BiEvoRes_brm
 })
 
+# ##### SUBSET MODEL
+if(file.exists(file.path(Dir.LogiEvoRes, "BiEvoResSUBSET_brm.RData"))){
+  load(file.path(Dir.LogiEvoRes, "BiEvoResSUBSET_brm.RData"))
+}else{
+  BiEvoRes_brm <- brm(formula = EvoRes ~ pert.name + VA * AC * abs(SL-1),
+                      data = EVORES_Metrics[EVORES_Metrics$DI == 2 & EVORES_Metrics$MU == 0
+                                            |
+                                            EVORES_Metrics$DI == 1.5 & EVORES_Metrics$MU == 1
+                                            , ],
+                      family = bernoulli(link = "logit"),
+                      warmup = 3e3,
+                      iter = 1e4,
+                      chains = 4,
+                      cores = 4,
+                      seed = 42)
+  save(BiEvoRes_brm, file = file.path(Dir.LogiEvoRes, "BiEvoResSUBSET_brm.RData"))
+}
+BiEvoResSubset_brm <- BiEvoRes_brm
+LogisticModelDiagnostics(BiEvoResSubset_brm, title = "Logistic Evolutionary Rescue Model (DI = 1.5 & MU = 1; DI = 2 & MU = 0)") 
+
 ### MULTILEVEL TRIAL -----
-### to try:
-#' Pre-perturbation population metrics (u_sd, etc.) are driven landscape parameters?
-#' Pre-perturbation population metrics then predict post-perturbation population metrics together with perturbation magnitude and population parameters?
-#' Evolutionary rescue is driven post-perturbation population metrics as well as population and landscape parameters
-#' Might want to consider splitting the resulting model(s) by mutation and/or dispersal
-#' Might want to run one full interaction model
-#' Maybe run initially for MU = 0 and DI = 2 as well as MU = 1 and DI = 1.5?
-
-
+## fits terribly.... 
 if(file.exists(file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))){
   load(file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))
 }else{
   BiEvoRes_MULTILEVEL_brm <- brm(
     ## model formulae
-      # logistic outcome
+    # logistic outcome
     bf(EvoRes ~ postmin_u_sd, family = bernoulli()) +  
       # post-pert population metrics
-    bf(postmin_u_sd ~ 0 + factor(MU) * abs(SL-1) * DI + pre_u_sd, family = hurdle_gamma()) +
+      bf(postmin_u_sd ~ pert.name + abs(SL-1) + AC + pre_u_sd,
+         family = mixture(hurdle_gamma, exgaussian),
+         # prior = c(
+         #   prior(normal(0, 10), Intercept, dpar = mu1),
+         #   prior(normal(100, 100), Intercept, dpar = mu2)
+         #   )
+      ) +
       # pre-pert population metrics
-    bf(pre_u_sd ~ 0 + factor(MU) * abs(SL-1) * DI * AC * VA)
+      bf(pre_u_sd ~ 0 + factor(MU) * abs(SL-1) * DI * AC * VA)
     , 
     ## data
     data = EVORES_Metrics,
@@ -348,142 +413,36 @@ if(file.exists(file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))){
     seed = 42)
   save(BiEvoRes_MULTILEVEL_brm, file = file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))
 }
-LogisticModelDiagnostics(BiEvoRes_MULTILEVEL_brm)
-
-
-# Combine the formulas into a single model
-multi_level_model2 <- brm(
-  # model formulae
-  bf(EvoRes ~ PoMiTrSD, family = bernoulli()) + 
-  bf(PoMiTrSD ~ 0 + factor(MU) * abs(SL-1) * DI, family = Gamma()),
-  # data
-  data = EvoResMod_df[EvoResMod_df$PoMiTrSD != 0,],
-  # settings for run
-  chains = 4,
-  cores = parallel::detectCores(),
-  iter = 1e4,
-  warmup = 3e3
-)
-save(multi_level_model2, file = "multi_level_model2.RData")
-
-multi_level_model <- brm(
-  # model formulae
-  bf(EvoRes ~ PoMiTrSD, family = bernoulli()) + 
-  bf(PoMiTrSD ~ 0 + factor(MU) * abs(SL-1) * DI, family = hurdle_gamma()),
-  # data
-  data = EvoResMod_df,
-  # settings for run
-  chains = 4,
-  cores = parallel::detectCores(),
-  iter = 1e4,
-  warmup = 3e3
-)
-save(multi_level_model, file = "multi_level_model.RData")
-
-# Summarize the model
-summary(multi_level_model)
-
-# Plot the results
-plot(multi_level_model)
-
-
-
-Model_brm <- multi_level_model
-
-# model diagnostics
-# summary(Model_brm) # all coefficients significant
-if(any(abs(rhat(Model_brm)-1) > 1.05)){# everything converged
-  message("Some rhat values are worryingly large")
-}
-# plot(Model_brm) # everything converged
-# neff_ratio(Model_brm) # looks alright
-ppcheckEvoRes_gg <- pp_check(Model_brm, resp = "EvoRes", type = "bars") # looks alright
-ppcheckTraits_gg <- pp_check(Model_brm, resp = "PoMiTrSD") # needs modification, outcome is strictly zero-positive
-
-#### Coefficient Plotting
-## extract posterior draws
-plot_coeffs <- Model_brm |> 
-  gather_draws(`^b_.*`, regex = TRUE) |>
-  mutate(.panel = ifelse(grepl(.variable, pattern = "EvoRes"), 
-                         "Evolutionary Rescue", "Post Minimum Trait Spread")) 
-
-## significance of coefficients
-signif_df <- data.frame(coeff = rownames(summary(Model_brm)[["fixed"]]),
-                        signif = abs(sign(summary(Model_brm)[["fixed"]]$`l-95% CI`) + 
-                                       sign(summary(Model_brm)[["fixed"]]$`u-95% CI`)) == 2)
-plot_coeffs$signif <- signif_df$signif[match(gsub(plot_coeffs$.variable, pattern = "b_", replacement = ""), signif_df$coeff)]
-
-# ## define plotting panel names
-# plot_coeffs$.panel[
-#   which(plot_coeffs$.variable %in% unique(grep(paste(c("MU", "DI"),collapse = "|"), plot_coeffs$.variable, value = TRUE))) 
-# ] = "Population"
-# plot_coeffs$.panel[
-#   which(plot_coeffs$.variable %in% unique(grep(paste(c("AC", "SL", "VA"),collapse = "|"), plot_coeffs$.variable, value = TRUE)))
-# ] = "Environment"
-# plot_coeffs$.variable <- gsub(plot_coeffs$.variable, pattern = "b_", replacement = "")
-# plot_coeffs$.variable[which(plot_coeffs$.variable == "pert.name")] <- "PM"
-
-# ## define order of coefficients in plotting
-# varfacs <- sort(unique(plot_coeffs$.variable))
-# varfacs <- c("Intercept", "PM", varfacs[!(varfacs %in% c("Intercept", "PM"))])
-
-## plotting
-Coeffplots <- plot_coeffs |> 
-  ggplot(aes(x = .value, y = factor(.variable), fill = signif)) +
-  geom_vline(xintercept = 0) + 
-  stat_halfeye(normalize = "xy") + 
-  facet_wrap(~ factor(.panel),
-             scales = "free",
-             ncol = 2) +
-  theme_bw() + theme(legend.position = "none") + 
-  labs(x = "Coefficient ", y = "Coefficient Estimate")
-Coeffplots
-
-#### Combined Plots
-cowplot::plot_grid(Coeffplots, cowplot::plot_grid(ppcheckEvoRes_gg, ppcheckTraits_gg, ncol = 2), ncol = 1)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+MultiLevelModelDiagnostics(BiEvoRes_MULTILEVEL_brm)
 
 
 ### Success Regression ----------------------------
+Dir.ContEvoRes <- file.path(Dir.Exports, "EvoRes_Continuous")
+if(!dir.exists(Dir.ContEvoRes)){dir.create(Dir.ContEvoRes)}
 
+if(file.exists(file.path(Dir.ContEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))){
+  load(file.path(Dir.ContEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))
+}else{
+  ContEvoRes_MULTILEVEL_brm <- brm(
+    ## model formulae
+    # Recovery
+    bf(perc_maxpostmin ~ perc_minpost + postmin_u_sd/postmax_u_sd) +  
+    # Resistance
+    bf(perc_minpost ~ pert.name + abs(SL-1) + AC + pre_u_sd,
+         family = hurdle_gamma()
+      )
+    , 
+    ## data
+    data = MODEL_Metrics,
+    ## settings for run
+    chains = 4,
+    cores = parallel::detectCores(),
+    iter = 1e4,
+    warmup = 3e3,
+    seed = 42)
+  save(ContEvoRes_MULTILEVEL_brm, file = file.path(Dir.ContEvoRes, "ContEvoRes_MULTILEVEL_brm.RData"))
+}
+MultiLevelModelDiagnostics(ContEvoRes_MULTILEVEL_brm, type = c("cont", "cont"))
 
 
 
