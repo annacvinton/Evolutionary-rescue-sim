@@ -34,7 +34,7 @@ package_vec <- c(
   "parallel",
   "e1071", # for skewness and kurtosis calculation
   "sp",
-  "rgeos",
+  # "rgeos",
   "nabor" # for knn nearest neighbours
 )
 sapply(package_vec, install.load.package)
@@ -70,6 +70,8 @@ Data_ls <- pblapply(Sims_fs,
                         duplicates_check <- with(data_df, paste(
                           pert.name, rep, t, sep = "_"
                         ))
+                        keeprows <- (data_df$t <= 1110)
+                        data_df <- data_df[keeprows, ]
                         
                         ## Simulation Settings ----
                         Ident_vec <- unlist(strsplit(tools::file_path_sans_ext(x), "_")) # vector of identifiers
@@ -79,7 +81,7 @@ Data_ls <- pblapply(Sims_fs,
                         MU <- Ident_vec[3]
                         SL <- Ident_vec[4]
                         VA <- Ident_vec[5]
-                        
+
                         ## Population size ----
                         N <- aggregate(n ~ t+pert.name+rep, data = data_df, FUN = mean)
                         N$AC <- AC
@@ -87,7 +89,7 @@ Data_ls <- pblapply(Sims_fs,
                         N$MU <- MU
                         N$SL <- SL
                         N$VA <- VA
-                        
+
                         ## Trait measures ----
                         u_mean <- aggregate(u ~ t+pert.name+rep, data = data_df,
                                             FUN = mean)$u
@@ -115,7 +117,7 @@ Data_ls <- pblapply(Sims_fs,
                                                       FUN = e1071::skewness)$MalAdaptedness
                         MalAdap_kurtosis <- aggregate(MalAdaptedness ~ t+pert.name+rep, data = data_df,
                                                       FUN = e1071::kurtosis)$MalAdaptedness
-                        
+
                         ## Spatial measures ----
                         min.d <- c()
                         SimSteps <- unique(duplicates_check) # loop over all individual combinations of timesteps respective to simulation runs
@@ -134,7 +136,7 @@ Data_ls <- pblapply(Sims_fs,
                           k <- k+1
                         }
                         data_df$NN_Distance <- min.d
-                        
+
                         NNDist_mean <- aggregate(NN_Distance ~ t+pert.name+rep, data = data_df,
                                                  FUN = mean, na.action = NULL)$NN_Distance
                         NNDist_sd <- aggregate(NN_Distance ~ t+pert.name+rep, data = data_df,
@@ -143,7 +145,7 @@ Data_ls <- pblapply(Sims_fs,
                                                      FUN = e1071::skewness, na.action = NULL)$NN_Distance
                         NNDist_kurtosis <- aggregate(NN_Distance ~ t+pert.name+rep, data = data_df,
                                                      FUN = e1071::kurtosis, na.action = NULL)$NN_Distance
-                        
+
                         ## Final data frame ----
                         return_df <- cbind(N,
                                            data.frame(
