@@ -50,7 +50,7 @@ runtimes <- aggregate(Data_df, t ~ pert.name + rep + AC + DI + MU + SL + VA, FUN
 
 ## Survival Classification ------------------------------------------------
 runtimes$survival <- TRUE
-runtimes$survival[runtimes$t < 1000] <- FALSE
+runtimes$survival[runtimes$t < 1110] <- FALSE
 runtimes$ID <- 1:nrow(runtimes)
 
 ## Non-Survival Classification --------------------------------------------
