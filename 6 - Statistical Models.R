@@ -284,171 +284,113 @@ if(file.exists(file.path(Dir.Exports, "MODEL_Metrics.RData"))){
   save(MODEL_Metrics, file = file.path(Dir.Exports, "MODEL_Metrics.RData")) 
 }
 
+# MODEL_Metrics$Recovery <- sqrt((MODEL_Metrics$n_pre - MODEL_Metrics$n_maxpost)^2 + (MODEL_Metrics$t_maxpost - MODEL_Metrics$t_minpost)^2) # Higher value = lower resistance, because either big dip in abundance or long time of decline until minimum
+# MODEL_Metrics$Resistance <- sqrt((MODEL_Metrics$n_pre - MODEL_Metrics$n_minpost)^2 + (MODEL_Metrics$t_minpost - 450)^2)
+
+MODEL_Metrics$perc_t_maxpost <- (MODEL_Metrics$t_maxpost - MODEL_Metrics$t_minpost)/(MODEL_Metrics$t-MODEL_Metrics$t_minpost)
+MODEL_Metrics$perc_t_minpost <- (MODEL_Metrics$t_minpost - 450)/450
+
+load(file.path(Dir.Exports, "POPULATION_TimeStep.RData"))
+POPULATION_Timestep <- Data_df
+rm(Data_df)
+
 # MODELS ==================================================================
-## Survival ---------------------------------------------------------------
-Dir.LogiSurv <- file.path(Dir.Exports, "Survival_Logistic")
-if(!dir.exists(Dir.LogiSurv)){dir.create(Dir.LogiSurv)}
+### Intermediate Optimum Slope --------------------
+#' how does slope affect trait values?
+ggplot(POPULATION_Timestep[
+  POPULATION_Timestep$MU == 0 &
+  POPULATION_Timestep$DI == 2 &
+  POPULATION_Timestep$t == 450
+  ,
+],
+       aes(y = u_sd, x = factor(SL))) + 
+  geom_boxplot() + 
+  facet_grid(AC ~ VA, labeller = label_both) + 
+  theme_bw() + 
+  labs(title = "Pre-perturbation trait variation - MU = 0, DI = 2")
 
-### Model Fitting ----
-##### SINGLE MODEL
-if(file.exists(file.path(Dir.LogiSurv, "BiSurv_brm.RData"))){
-  load(file.path(Dir.LogiSurv, "BiSurv_brm.RData"))
+ggplot(POPULATION_Timestep[
+  POPULATION_Timestep$MU == 1 &
+    POPULATION_Timestep$DI == 1.5 &
+    POPULATION_Timestep$t == 450
+  ,
+],
+aes(y = u_sd, x = factor(SL))) + 
+  geom_boxplot() + 
+  facet_grid(AC ~ VA, labeller = label_both) + 
+  theme_bw() + 
+  labs(title = "Pre-perturbation trait variation - MU = 1, DI = 1.5")
+
+### Resilience Regression -------------------------
+stop("SPLIT OUT Speediness and Change in abundance seperately before attempting aggregate metrics")
+
+
+if(file.exists(file.path(Dir.Exports, "ContEvoRes_MULTILEVEL_brm.RData"))){
+  load(file.path(Dir.Exports, "ContEvoRes_MULTILEVEL_brm.RData"))
 }else{
-  BiSurv_brm <- brm(formula = survival ~ pert.name + SL + DI * factor(MU),
-                    data = MODEL_Metrics,
-                    family = bernoulli(link = "logit"),
-                    warmup = 3e3,
-                    iter = 1e4,
-                    chains = 4,
-                    cores = 4,
-                    seed = 42)
-  save(BiSurv_brm, file = file.path(Dir.LogiSurv, "BiSurv_brm.RData"))
-}
-BiSurvFinal_brm <- BiSurv_brm
-LogisticModelDiagnostics(BiSurvFinal_brm, title = "Logistic Survival Model")
-
-## Evolutionary Rescue ----------------------------------------------------
-### Logistic Regression ---------------------------
-Dir.LogiEvoRes <- file.path(Dir.Exports, "EvoRes_Logistic")
-if(!dir.exists(Dir.LogiEvoRes)){dir.create(Dir.LogiEvoRes)}
-
-## analyse only simulations with sufficient crash
-EVORES_Metrics <- MODEL_Metrics[MODEL_Metrics$EvoRes != "Insufficient Population Crash", ]
-EVORES_Metrics$EvoRes <- as.numeric(as.logical(EVORES_Metrics$EvoRes))
-
-#### Model Fitting ----
-##### SINGLE MODEL
-if(file.exists(file.path(Dir.LogiEvoRes, "BiEvoRes_brm.RData"))){
-  load(file.path(Dir.LogiEvoRes, "BiEvoRes_brm.RData"))
-}else{
-  BiEvoRes_brm <- brm(formula = EvoRes ~ pert.name + VA * AC * abs(SL-1) + DI + factor(MU),
-                      data = EVORES_Metrics,
-                      family = bernoulli(link = "logit"),
-                      warmup = 3e3,
-                      iter = 1e4,
-                      chains = 4,
-                      cores = 4,
-                      seed = 42)
-  save(BiEvoRes_brm, file = file.path(Dir.LogiEvoRes, "BiEvoRes_brm.RData"))
-}
-BiEvoResFinal_brm <- BiEvoRes_brm
-LogisticModelDiagnostics(BiEvoResFinal_brm, title = "Logistic Evolutionary Rescue Model")
-
-##### SPLITTING
-ModelCombs <- with(na.omit(EVORES_Metrics), expand.grid(unique(DI), unique(MU)))
-colnames(ModelCombs) <- c("DI", "MU")
-
-BiEvoRes_ls <- lapply(1:nrow(ModelCombs), FUN = function(iter){
-  FNAME <- file.path(Dir.LogiEvoRes, paste0("BiEvoRes_brm_DI-", ModelCombs$DI[iter], "_MU-", ModelCombs$MU[iter],".RData"))
-  if(file.exists(FNAME)){
-    load(FNAME)
-  }else{
-    BiEvoRes_brm <- brm(formula = EvoRes ~ pert.name + VA * AC * abs(SL-1),
-                        data = EVORES_Metrics[
-                          (EVORES_Metrics$DI == ModelCombs$DI[iter] &
-                             EVORES_Metrics$MU == ModelCombs$MU[iter]),
-                        ],
-                        family = bernoulli(link = "logit"),
-                        warmup = 3e3,
-                        iter = 1e4,
-                        chains = 4,
-                        cores = 4,
-                        seed = 42)
-    # Sys.sleep(60*30)
-    save(BiEvoRes_brm, file = FNAME)
-  }
-  plot <- LogisticModelDiagnostics(BiEvoRes_brm,
-                           title = paste(paste(colnames(ModelCombs), ModelCombs[iter,], sep = " = "), collapse = " & "))
-  print(plot)
-  BiEvoRes_brm
-})
-
-# ##### SUBSET MODEL
-if(file.exists(file.path(Dir.LogiEvoRes, "BiEvoResSUBSET_brm.RData"))){
-  load(file.path(Dir.LogiEvoRes, "BiEvoResSUBSET_brm.RData"))
-}else{
-  BiEvoRes_brm <- brm(formula = EvoRes ~ pert.name + VA * AC * abs(SL-1),
-                      data = EVORES_Metrics[EVORES_Metrics$DI == 2 & EVORES_Metrics$MU == 0
-                                            |
-                                            EVORES_Metrics$DI == 1.5 & EVORES_Metrics$MU == 1
-                                            , ],
-                      family = bernoulli(link = "logit"),
-                      warmup = 3e3,
-                      iter = 1e4,
-                      chains = 4,
-                      cores = 4,
-                      seed = 42)
-  save(BiEvoRes_brm, file = file.path(Dir.LogiEvoRes, "BiEvoResSUBSET_brm.RData"))
-}
-BiEvoResSubset_brm <- BiEvoRes_brm
-LogisticModelDiagnostics(BiEvoResSubset_brm, title = "Logistic Evolutionary Rescue Model (DI = 1.5 & MU = 1; DI = 2 & MU = 0)") 
-
-### MULTILEVEL TRIAL -----
-## fits terribly.... 
-if(file.exists(file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))){
-  load(file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))
-}else{
-  BiEvoRes_MULTILEVEL_brm <- brm(
-    ## model formulae
-    # logistic outcome
-    bf(EvoRes ~ postmin_u_sd, family = bernoulli()) +  
-      # post-pert population metrics
-      bf(postmin_u_sd ~ pert.name + abs(SL-1) + AC + pre_u_sd,
-         family = mixture(hurdle_gamma, exgaussian),
-         # prior = c(
-         #   prior(normal(0, 10), Intercept, dpar = mu1),
-         #   prior(normal(100, 100), Intercept, dpar = mu2)
-         #   )
-      ) +
-      # pre-pert population metrics
-      bf(pre_u_sd ~ 0 + factor(MU) * abs(SL-1) * DI * AC * VA)
-    , 
-    ## data
-    data = EVORES_Metrics,
-    ## settings for run
-    chains = 4,
-    cores = parallel::detectCores(),
-    iter = 1e4,
-    warmup = 3e3,
-    seed = 42)
-  save(BiEvoRes_MULTILEVEL_brm, file = file.path(Dir.LogiEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))
-}
-MultiLevelModelDiagnostics(BiEvoRes_MULTILEVEL_brm)
-
-
-### Success Regression ----------------------------
-Dir.ContEvoRes <- file.path(Dir.Exports, "EvoRes_Continuous")
-if(!dir.exists(Dir.ContEvoRes)){dir.create(Dir.ContEvoRes)}
-
-if(file.exists(file.path(Dir.ContEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))){
-  load(file.path(Dir.ContEvoRes, "BiEvoRes_MULTILEVEL_brm.RData"))
-}else{
+  Bayes_df <- MODEL_Metrics[MODEL_Metrics$survival == 1, ]
+  Bayes_df$Recovery <- Bayes_df$perc_maxpostpre * Bayes_df$perc_t_maxpost
+  Bayes_df$Resistance <- Bayes_df$perc_minpost * Bayes_df$perc_t_minpost
+  
   ContEvoRes_MULTILEVEL_brm <- brm(
     ## model formulae
     # Recovery
-    bf(perc_maxpostmin ~ perc_minpost + postmin_u_sd/postmax_u_sd) +  
+    bf(Recovery ~ perc_minpost + postmin_u_sd/postmax_u_sd) +  
     # Resistance
-    bf(perc_minpost ~ pert.name + abs(SL-1) + AC + pre_u_sd,
+    bf(Resistance  ~ pert.name + abs(SL-1) + AC + pre_u_sd,
          family = hurdle_gamma()
       )
     , 
     ## data
-    data = MODEL_Metrics,
+    data = Bayes_df,
     ## settings for run
     chains = 4,
     cores = parallel::detectCores(),
     iter = 1e4,
     warmup = 3e3,
     seed = 42)
-  save(ContEvoRes_MULTILEVEL_brm, file = file.path(Dir.ContEvoRes, "ContEvoRes_MULTILEVEL_brm.RData"))
+  save(ContEvoRes_MULTILEVEL_brm, file = file.path(Dir.Exports, "ContEvoRes_MULTILEVEL_brm.RData"))
 }
 MultiLevelModelDiagnostics(ContEvoRes_MULTILEVEL_brm, type = c("cont", "cont"))
 
+if(file.exists(file.path(Dir.Exports, "ContEvoRes_MULTILEVEL2_brm.RData"))){
+  load(file.path(Dir.Exports, "ContEvoRes_MULTILEVEL2_brm.RData"))
+}else{
+  Bayes_df <- MODEL_Metrics[MODEL_Metrics$survival == 1, ] #  & MODEL_Metrics$MU == 0
+  Bayes_df$Recovery <- rowMeans(cbind(Bayes_df$perc_maxpostpre, Bayes_df$perc_t_maxpost))
+  Bayes_df$Resistance <- rowMeans(cbind(Bayes_df$perc_minpost, Bayes_df$perc_t_minpost))
+  ContEvoRes_MULTILEVEL2_brm <- brm(
+    ## model formulae
+    # Recovery
+    bf(Recovery ~ perc_minpost * postmin_u_sd/postmax_u_sd * MU,
+       family = hurdle_gamma()
+       ) +  
+    # Resistance
+    bf(Resistance ~ pert.name + abs(SL-1) + AC + pre_u_sd,
+         family = hurdle_gamma()
+      )
+    , 
+    ## data
+    data = Bayes_df,
+    ## settings for run
+    chains = 4,
+    cores = parallel::detectCores(),
+    iter = 1e4,
+    warmup = 3e3,
+    seed = 42)
+  save(ContEvoRes_MULTILEVEL2_brm, file = file.path(Dir.Exports, "ContEvoRes_MULTILEVEL2_brm.RData"))
+}
+MultiLevelModelDiagnostics(ContEvoRes_MULTILEVEL2_brm, type = c("cont", "cont"))
 
 
 
-
-
+### Population Trajectory Identification ----------
+#' Trajectories:
+#'  - Extinction
+#'  - No Rescue
+#'  - Rescue
+#'    --> Mutation-facilitated
+#'    --> Non-Mutation facilitated
 
 
 
