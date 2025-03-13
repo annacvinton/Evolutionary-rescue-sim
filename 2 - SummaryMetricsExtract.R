@@ -67,11 +67,11 @@ Data_ls <- pblapply(Sims_fs,
                         load(file.path(Dir.Exports, paste0("TEMP_TStepPop_", x, ".RData")))
                       }else{
                         data_df <- readRDS(file.path(Dir.Data, x))
+                        keeprows <- (data_df$t <= 1110)
+                        data_df <- data_df[keeprows, ]
                         duplicates_check <- with(data_df, paste(
                           pert.name, rep, t, sep = "_"
                         ))
-                        keeprows <- (data_df$t <= 1110)
-                        data_df <- data_df[keeprows, ]
                         
                         ## Simulation Settings ----
                         Ident_vec <- unlist(strsplit(tools::file_path_sans_ext(x), "_")) # vector of identifiers

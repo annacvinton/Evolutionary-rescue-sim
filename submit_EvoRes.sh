@@ -2,7 +2,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=50G
-#SBATCH --time=24:00:00
+#SBATCH --time=3-24
 #SBATCH --partition=compute
 #SBATCH --job-name=EK_EvoRes
 
