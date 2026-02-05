@@ -57,3 +57,6 @@ Visiting Researcher Agreement_OIST_Erik Kusch_signed_E-Signature of Provost.pdf
 Visiting Researcher Agreement (En+J)_ver8_0_OIST_Erik Kusch.docx
 submit_EvoRes.sh
 ModelMeeting.pptx
+.megaignore
+desktop.ini
+Rubbish/*

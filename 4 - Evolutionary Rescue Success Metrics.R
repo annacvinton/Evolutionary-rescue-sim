@@ -30,8 +30,8 @@ install.load.package <- function(x) {
 package_vec <- c(
   "pbapply",
   "parallel",
-  "ggplot2",
-  "cowplot",
+  #"ggplot2",
+  #"cowplot",
   "dplyr"
 )
 sapply(package_vec, install.load.package)
@@ -56,7 +56,7 @@ runtimes$ID <- 1:nrow(runtimes)
 ## Non-Survival Classification --------------------------------------------
 noext <- runtimes[runtimes$survival, ]
 
-cl <- makeCluster(detectCores())
+cl <- makeCluster(30)
 clusterExport(cl, c("conditions", "Data_df", "%nin%", "noext"))
 
 evoressuc_ls <- pblapply(1:nrow(noext), 
@@ -80,6 +80,7 @@ evoressuc_ls <- pblapply(1:nrow(noext),
                              bind_df <- data.frame(
                                ID = noext$ID[l], 
                                n_pre = NA,
+                               n_post = NA,
                                n_minpost = NA,
                                t_minpost = NA,
                                n_maxpost = NA,
@@ -106,6 +107,7 @@ evoressuc_ls <- pblapply(1:nrow(noext),
                                , 
                                "n"
                              ]
+                             n_post <- iter_df[1, "n"]
                              ## minimum population size post perturbation
                              minpost <- which.min(iter_df$n)
                              minpost_df <- iter_df[minpost, c("n", "t")]
@@ -128,8 +130,9 @@ evoressuc_ls <- pblapply(1:nrow(noext),
 
                              ## combine into data frame
                              bind_df <- data.frame(
-                               n_pre = pre_n,
                                ID = noext$ID[l], 
+                               n_pre = pre_n,
+                               n_post = n_post,
                                n_minpost = minpost_df$n,
                                t_minpost = minpost_df$t,
                                n_maxpost = maxpost_df$n,
@@ -155,9 +158,10 @@ evoressuc_ls <- pblapply(1:nrow(noext),
 EVORES_Metrics <- do.call(rbind, evoressuc_ls)
 EVORES_Metrics <- na.omit(EVORES_Metrics)
 ## merging survival runs
-save_df <- base::merge(x = runtimes[], 
-                       y = EVORES_Metrics[, colnames(EVORES_Metrics) != "survival"], 
-                       by = "ID")
+save_df <- base::merge(
+  x = runtimes[], 
+  y = EVORES_Metrics[, colnames(EVORES_Metrics) != "survival"], 
+  by = "ID")
 ### bring back in non-survival runs
 EVORES_Metrics <- bind_rows(save_df, runtimes[!runtimes$survival, ])
 ### saving data
