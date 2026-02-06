@@ -112,8 +112,8 @@ if (file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData"))) {
             t_min <- EvoResSuc_iter$t_minpost[which(EvoResSuc_iter$rep == b)]
             t_max <- EvoResSuc_iter$t_maxpost[which(EvoResSuc_iter$rep == b)]
             comparison <- data.frame(
-              Envir = c("Pre", "Pre", "Pre", "Post", "Post", "Post"),
-              Traits = c("Pre", "PostMin", "PostMax", "PostMin", "PostMax", "Pre")
+              Envir = c("Pre", "Pre", "Pre", "Pre", "Post", "Post", "Post", "Post"),
+              Traits = c("Pre", "Post", "PostMin", "PostMax", "Post", "PostMin", "PostMax", "Pre")
             )
 
             plot_df <- data.frame(
@@ -121,12 +121,14 @@ if (file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData"))) {
                 Enviro_Cells_ls[[x]],
                 Enviro_Cells_ls[[x]] + z,
                 Popb_df$u[Popb_df$t == 460],
+                Popb_df$u[Popb_df$t == 470],
                 Popb_df$u[Popb_df$t == t_min],
                 Popb_df$u[Popb_df$t == t_max]
               ),
               Origin = c(
                 rep("Environment", (length(Enviro_Cells_ls[[x]])) * 2),
                 rep("Individuals", length(Popb_df$u[Popb_df$t == 460])),
+                rep("Individuals", length(Popb_df$u[Popb_df$t == 470])),
                 rep("Individuals", length(Popb_df$u[Popb_df$t == t_min])),
                 rep("Individuals", length(Popb_df$u[Popb_df$t == t_max]))
               ),
@@ -134,6 +136,7 @@ if (file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData"))) {
                 rep("Pre", length(Enviro_Cells_ls[[x]])),
                 rep("Post", length(Enviro_Cells_ls[[x]])),
                 rep("Pre", length(Popb_df$u[Popb_df$t == 460])),
+                rep("Post", length(Popb_df$u[Popb_df$t == 470])),
                 rep("PostMin", length(Popb_df$u[Popb_df$t == t_min])),
                 rep("PostMax", length(Popb_df$u[Popb_df$t == t_max]))
               )
@@ -208,20 +211,20 @@ if (file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))) {
 } else {
   order <- names(Enviro_Cells_ls) # [start_n:length(Enviro_Cells_ls)]
 
-  nC <- ifelse(length(order) > parallel::detectCores() / 2, parallel::detectCores() / 2, length(order))
-  cl <- makeCluster(nC)
-  clusterExport(
-    cl = cl, varlist = c(
-      "Dir.Data", "Dir.Exports", "install.load.package", "package_vec", "%nin%",
-      "EvoResSuc_df"
-    ),
-    envir = environment()
-  )
-  clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
+  # nC <- ifelse(length(order) > parallel::detectCores() / 2, parallel::detectCores() / 2, length(order))
+  # cl <- makeCluster(nC)
+  # clusterExport(
+  #   cl = cl, varlist = c(
+  #     "Dir.Data", "Dir.Exports", "install.load.package", "package_vec", "%nin%",
+  #     "EvoResSuc_df"
+  #   ),
+  #   envir = environment()
+  # )
+  # clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
 
   Overlap_ls <- pblapply(
     X = order,
-    cl = cl,
+    # cl = cl,
     FUN = function(x) {
       # x <- order[2]
 
@@ -294,8 +297,8 @@ if (file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))) {
                 t_min <- EvoResSuc_iter$t_minpost[which(EvoResSuc_iter$rep == b)]
                 t_max <- EvoResSuc_iter$t_maxpost[which(EvoResSuc_iter$rep == b)]
                 comparison <- data.frame(
-                  Envir = c("Pre", "Post", "Post", "Pre", "Pre", "Post"),
-                  Traits = c("Pre", "PostMin", "PostMax", "PostMin", "PostMax", "Pre")
+                  Envir = c("Pre", "Pre", "Pre", "Pre", "Post", "Post", "Post", "Post"),
+                  Traits = c("Pre", "Post", "PostMin", "PostMax", "Post", "PostMin", "PostMax", "Pre")
                 )
                 Enviro_ls <- list(
                   Pre = Enviro_ras,
@@ -310,7 +313,7 @@ if (file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))) {
                     # cl = cl,
                     FUN = function(comp_iter) {
                       # comp_iter <- 1
-                      t_iter <- c(460, t_min, t_max, t_min, t_max, 460)[comp_iter]
+                      t_iter <- c(460, 470, t_min, t_max, 470, t_min, t_max, 460)[comp_iter]
                       comparison_iter <- comparison[comp_iter, ]
                       # message("Comparison: ", paste(comparison_iter, collapse = " vs. "))
 
@@ -509,16 +512,16 @@ if (file.exists(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))) {
 ## Earth-Mover Distance ---------------------------------------------------
 if ("EMD2D" %nin% colnames(DISTRIBUTIONS_Spatial$Summary_df)) {
   order <- names(Enviro_Cells_ls) # [start_n:length(Enviro_Cells_ls)]
-  nC <- ifelse(length(order) > parallel::detectCores(), parallel::detectCores(), length(order))
-  cl <- makeCluster(nC)
-  clusterExport(
-    cl = cl, varlist = c(
-      "Dir.Data", "Dir.Exports", "install.load.package", "package_vec", "%nin%",
-      "EvoResSuc_df"
-    ),
-    envir = environment()
-  )
-  clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
+  # nC <- ifelse(length(order) > parallel::detectCores(), parallel::detectCores(), length(order))
+  # cl <- makeCluster(nC)
+  # clusterExport(
+  #   cl = cl, varlist = c(
+  #     "Dir.Data", "Dir.Exports", "install.load.package", "package_vec", "%nin%",
+  #     "EvoResSuc_df"
+  #   ),
+  #   envir = environment()
+  # )
+  # clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
 
   Overlap_ls <- pblapply(
     X = order,
