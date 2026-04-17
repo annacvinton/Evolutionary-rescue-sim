@@ -66,6 +66,7 @@ Model_ls <- lapply(ID_vec, function(id) {
             print.progress = FALSE
         )
         save(beast_mod, file = FNAME)
+        Sys.sleep(1)
         # plot(beast_mod)
     }
 
@@ -140,5 +141,6 @@ Model_ls <- lapply(ID_vec, function(id) {
     changePoints_df$rep <- strsplit(id, split = "-")[[1]][7]
 
     return(changePoints_df)
-    Sys.sleep(60)
 })
+BEAST_ChangePoints_df <- do.call(rbind, Models_ls)
+save(BEAST_ChangePoints_df, file = file.path(Dir.Exports, "BEAST_ChangePoints.RData"))
