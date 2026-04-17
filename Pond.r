@@ -55,8 +55,10 @@ sapply(package_vec, install.load.package)
 # Data Loading
 load(file.path(Dir.Exports, "POPULATION_TimeStep.RData"))
 Abund_df <- Data_df
-Abund_df <- Abund_df[Abund_df$pert.name > 7, ]
+Abund_df <- Abund_df[Abund_df$pert.name > 8, ]
 Abund_df <- Abund_df[Abund_df$pert.name < 14, ]
+Pre_df <- Abund_df[Abund_df$t == 460, ]
+Abund_df <- Abund_df[Abund_df$t > 500, ]
 rm(Data_df)
 
 sapply(c(0, 1), FUN = function(Mu) {
@@ -82,114 +84,123 @@ sapply(c(0, 1), FUN = function(Mu) {
 })
 
 ### Abundance; Individual ----
-Mu <- 0
-SimParams <- c("AC", "DI", "SL", "VA")
-Abundplot_df <- data.frame(
-    aggregate(x = n ~ t + AC + DI + SL + VA + pert.name, data = Abund_df[Abund_df$MU == Mu, ], FUN = mean),
-    sd = aggregate(x = n ~ t + AC + DI + SL + VA + pert.name, data = Abund_df[Abund_df$MU == Mu, ], FUN = sd)[, 7]
-)
-
-for (Param in SimParams) {
-    other_params <- setdiff(SimParams, Param)
-
-    # split data by all combinations of the OTHER parameters
-    df_list <- split(
-        Abundplot_df,
-        Abundplot_df[other_params],
-        drop = TRUE
+for (Mu in c(0, 1)) {
+    SimParams <- c("AC", "DI", "SL", "VA")
+    Abundplot_df <- data.frame(
+        aggregate(x = n ~ t + AC + DI + SL + VA + pert.name, data = Abund_df[Abund_df$MU == Mu, ], FUN = mean),
+        sd = aggregate(x = n ~ t + AC + DI + SL + VA + pert.name, data = Abund_df[Abund_df$MU == Mu, ], FUN = "sd")[, 7]
     )
 
-    for (i in seq_along(df_list)) {
-        df_sub <- df_list[[i]]
+    for (Param in SimParams) {
+        other_params <- setdiff(SimParams, Param)
 
-        combo_label <- paste(
-            paste(other_params,
-                sapply(df_sub[1, other_params], as.character),
-                sep = " = "
-            ),
-            collapse = ", "
+        # split data by all combinations of the OTHER parameters
+        df_list <- split(
+            Abundplot_df,
+            Abundplot_df[other_params],
+            drop = TRUE
         )
 
-        ## annotation data: number of simulations per facet
-        annot_df <- aggregate(
-            rep ~ get(Param) + pert.name,
-            data = Abund_df[
-                Abund_df$MU == Mu &
-                    Reduce(`&`, Map(
-                        `==`,
-                        Abund_df[other_params],
-                        df_sub[1, other_params]
-                    )),
-            ],
-            FUN = function(x) length(unique(x))
-        )
-        colnames(annot_df) <- c(Param, "pert.name", "n_rep")
-        annot_df$x <- 400
-        annot_df$label <- paste("n =", annot_df$n_rep)
-        base_y <- 500
-        y_step <- 50
-        annot_df$y <- base_y -
-            (as.numeric(factor(annot_df$pert.name)) - 1) * y_step
+        for (i in seq_along(df_list)) {
+            df_sub <- df_list[[i]]
 
-        p <- ggplot(
-            df_sub,
-            aes(
-                x = t, y = n,
-                colour = factor(pert.name),
-                fill = factor(pert.name)
-            )
-        ) +
-            geom_line() +
-            geom_ribbon(
-                aes(
-                    ymin = pmax(0, n - sd),
-                    ymax = n + sd
+            combo_label <- paste(
+                paste(other_params,
+                    sapply(df_sub[1, other_params], as.character),
+                    sep = " = "
                 ),
-                alpha = 0.2
-            ) +
-            facet_wrap(
-                as.formula(paste("~", Param)),
-                labeller = label_both
-            ) +
-            geom_text(
-                data = annot_df,
-                aes(x = x, y = y, label = label, colour = factor(pert.name)),
-                inherit.aes = FALSE,
-                size = 3,
-                show.legend = FALSE
-            ) +
-            lims(x = c(310, 1000), y = c(0, NA)) +
-            theme_bw() +
-            labs(
-                title = paste("Facetted by", Param),
-                subtitle = combo_label,
-                y = "Abundance",
-                x = "Time"
+                collapse = ", "
             )
 
-        print(p)
+            ## annotation data: number of simulations per facet
+            annot_df <- aggregate(
+                rep ~ get(Param) + pert.name,
+                data = Abund_df[
+                    Abund_df$MU == Mu &
+                        Reduce(`&`, Map(
+                            `==`,
+                            Abund_df[other_params],
+                            df_sub[1, other_params]
+                        )),
+                ],
+                FUN = function(x) length(unique(x))
+            )
+            colnames(annot_df) <- c(Param, "pert.name", "n_rep")
+            annot_df$n_pre <- sapply(1:nrow(annot_df), function(i) {
+                row <- annot_df[i, ]
+                conditions <- Pre_df[[Param]] == row[[Param]] & Pre_df$pert.name == row$pert.name
+                for (op in other_params) {
+                    conditions <- conditions & Pre_df[[op]] == df_sub[1, op]
+                }
+                sum(conditions)
+            })
+            annot_df$x <- 400
+            annot_df$label <- paste("n =", annot_df$n_rep, "(", annot_df$n_pre / annot_df$n_rep, "%)")
+            base_y <- 500
+            y_step <- 50
+            annot_df$y <- base_y -
+                (as.numeric(factor(annot_df$pert.name)) - 1) * y_step
 
-        pb <- ggplot_build(p)
-        layout <- pb$layout$layout
+            p <- ggplot(
+                df_sub,
+                aes(
+                    x = t, y = n,
+                    colour = factor(pert.name),
+                    fill = factor(pert.name)
+                )
+            ) +
+                geom_line() +
+                geom_ribbon(
+                    aes(
+                        ymin = pmax(0, n - sd),
+                        ymax = n + sd
+                    ),
+                    alpha = 0.2
+                ) +
+                facet_wrap(
+                    as.formula(paste("~", Param)),
+                    labeller = label_both
+                ) +
+                geom_text(
+                    data = annot_df,
+                    aes(x = x, y = y, label = label, colour = factor(pert.name)),
+                    inherit.aes = FALSE,
+                    size = 3,
+                    show.legend = FALSE
+                ) +
+                lims(x = c(310, 1000), y = c(0, NA)) +
+                theme_bw() +
+                labs(
+                    title = paste("Facetted by", Param),
+                    subtitle = combo_label,
+                    y = "Abundance",
+                    x = "Time"
+                )
 
-        n_cols <- length(unique(layout$COL))
-        n_rows <- length(unique(layout$ROW))
+            # print(p)
 
-        panel_width <- 7
-        panel_height <- 5
+            pb <- ggplot_build(p)
+            layout <- pb$layout$layout
 
-        plot_width <- n_cols * panel_width
-        plot_height <- n_rows * panel_height
+            n_cols <- length(unique(layout$COL))
+            n_rows <- length(unique(layout$ROW))
 
-        ## save plot
-        file_stub <- gsub("[^A-Za-z0-9_=]", "_", combo_label)
-        ggsave(
-            filename = paste0("Pond_", Param, "_", file_stub, ".png"),
-            plot = p,
-            width = plot_width,
-            height = plot_height,
-            dpi = 300,
-            limitsize = FALSE
-        )
+            panel_width <- 7
+            panel_height <- 5
+
+            plot_width <- n_cols * panel_width
+            plot_height <- n_rows * panel_height
+
+            ## save plot
+            file_stub <- gsub("[^A-Za-z0-9_=]", "_", combo_label)
+            ggsave(
+                filename = paste0("Pond_MU", Mu, "_", Param, "_", file_stub, ".png"),
+                plot = p,
+                width = plot_width,
+                height = plot_height,
+                dpi = 300,
+                limitsize = FALSE
+            )
+        }
     }
 }
