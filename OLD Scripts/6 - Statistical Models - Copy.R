@@ -1,9 +1,13 @@
 #' ####################################################################### #
 #' PROJECT: [Evolutionary Rescue in Complex Landscapes]
 #' CONTENTS:
-#'  - Statistical Models of Evolutionary Rescue Moments
+#'  - Statistical Models of
+#'    - Survival Likelihood
+#'    - Evolutionary Rescue Likelihood
+#'    - Evolutionary Rescue Success
 #'  DEPENDENCIES:
-#'  - BEAST_ChangePoints.RData produced by "5 - BEAST-TimeSeries.r"
+#'  - EVORES_Metrics.RData produced by "4 - Evolutionary Rescue Success Metrics.R"
+#'  - DISTRIBUTIONS_Spatial.RData produced by "5 - DistributionComparison.R"
 #' AUTHOR: [Erik Kusch]
 #' ####################################################################### #
 
@@ -51,19 +55,47 @@ sapply(package_vec, install.load.package)
 `%nin%` <- Negate(`%in%`) # a function for negation of %in% function
 
 # DATA ====================================================================
-
-## Data Preparation -------------------------------------------------------
 if (file.exists(file.path(Dir.Exports, "MODEL_Metrics.RData"))) {
     load(file.path(Dir.Exports, "MODEL_Metrics.RData"))
 } else {
     ## Simulation Outcomes ----------------------------------------------------
     EVORES_Metrics <- readRDS(file.path(Dir.Exports, "ModelData.rds"))
-    # EVORES_Metrics <- EVORES_Metrics[EVORES_Metrics$pert.name >= 9, ]
+    EVORES_Metrics <- EVORES_Metrics[EVORES_Metrics$pert.name >= 9, ]
     # EVORES_Metrics$EvoRes[!EVORES_Metrics$SuffDip] <- "Insufficient Population Crash"
     # EVORES_Metrics$survival <- as.numeric(EVORES_Metrics$survival)
 
     ## Population-Level Summaries ---------------------------------------------
     load(file.path(Dir.Exports, "POPULATION_TimeStep.RData"))
+
+    ## Distribution Comparisons -----------------------------------------------
+    # ### Non-Spatially Explicit ----
+    # load(file.path(Dir.Exports, "DISTRIBUTIONS_NonSpatial.RData"))
+    # DISTRIBUTIONS_NonSpatial <- DISTRIBUTIONS_NonSpatial[DISTRIBUTIONS_NonSpatial$Pert >= 9, ]
+
+    ## Spatially Explicit ----
+    # load(file.path(Dir.Exports, "DISTRIBUTIONS_Spatial.RData"))
+    # DISTRIBUTIONS_Spatial <- DISTRIBUTIONS_Spatial[["Summary_df"]]
+    # rownames(DISTRIBUTIONS_Spatial) <- c()
+    # DISTRIBUTIONS_Spatial <- DISTRIBUTIONS_Spatial[DISTRIBUTIONS_Spatial$Pert >= 9, ]
+
+    # ### Fusing ----
+    # DISTRIBUTION_Metrics <- base::merge(DISTRIBUTIONS_Spatial, DISTRIBUTIONS_NonSpatial)
+    # DISTRIBUTION_Metrics$Comparisons <- paste(
+    #     paste("[Environment]", DISTRIBUTION_Metrics$Envir),
+    #     "vs.",
+    #     paste("[Individuals]", DISTRIBUTION_Metrics$Indivs)
+    # )
+    # DISTRIBUTION_Metrics$Comparisons <-
+    #     factor(DISTRIBUTION_Metrics$Comparisons,
+    #         levels = c(
+    #             "[Environment] Pre vs. [Individuals] Pre",
+    #             "[Environment] Post vs. [Individuals] PostMin",
+    #             "[Environment] Post vs. [Individuals] PostMax",
+    #             "[Environment] Pre vs. [Individuals] PostMin",
+    #             "[Environment] Pre vs. [Individuals] PostMax"
+    #         )
+    #     )
+    # colnames(DISTRIBUTION_Metrics)[4] <- "pert.name"
 
     ### Break Points --------------
     load(file.path(Dir.Exports, "BEAST_ChangePoints.RData"))
@@ -82,7 +114,7 @@ if (file.exists(file.path(Dir.Exports, "MODEL_Metrics.RData"))) {
     Combination_ls <- pblapply(MatchID_vec,
         cl = parallel::detectCores(),
         FUN = function(x) {
-            # x <- MatchID_vec[976]
+            # x <- "9_7_4_1.5_0_0.8_100" # MatchID_vec[1]
             # print(x)
             Iter_df <- BEAST_ChangePoints_df[BEAST_ChangePoints_df$MatchID == x, ]
 
@@ -132,37 +164,29 @@ if (file.exists(file.path(Dir.Exports, "MODEL_Metrics.RData"))) {
         }
     )
 
-    #' Combining all iterations into one data frame
+    #' 4. Saving final file
     # remove NULL elements from list
     KeepElems <- sapply(Combination_ls, function(x) if (!is.null(x)) TRUE else FALSE)
     MODEL_Metrics <- do.call(rbind, Combination_ls)
-
-    #' 6. Relative Metrics
-    MODEL_Metrics$Res_Magnitude <- (MODEL_Metrics$CP1_n - MODEL_Metrics$pre_n) / MODEL_Metrics$pre_n
-    MODEL_Metrics$Res_Speed <- MODEL_Metrics$CP1_t - MODEL_Metrics$pre_t
-    MODEL_Metrics$Rec_Magnitude <- (MODEL_Metrics$CP2_n - MODEL_Metrics$CP1_n) / MODEL_Metrics$CP1_n
-    MODEL_Metrics$Rec_Speed <- MODEL_Metrics$CP2_t - MODEL_Metrics$CP1_t
-    MODEL_Metrics$Rec_MagnitudePre <- (MODEL_Metrics$CP2_n - MODEL_Metrics$pre_n) / MODEL_Metrics$pre_n
-    MODEL_Metrics$Rec_SpeedPre <- MODEL_Metrics$CP2_t - MODEL_Metrics$pre_t
-
-    #' 7. Saving final file
     save(MODEL_Metrics, file = file.path(Dir.Exports, "MODEL_Metrics.RData"))
 }
-MODEL_Metrics$pert <- as.numeric(MODEL_Metrics$pert)
-MODEL_Metrics <- MODEL_Metrics[MODEL_Metrics$Rec_Magnitude >= 0, ] # limit to only those runs where second change-point indicators abundance recovery
+# # ## express times between abundances as percentages
+# # MODEL_Metrics$perc_t_maxpost <- (MODEL_Metrics$t_maxpost - MODEL_Metrics$t_minpost) / (MODEL_Metrics$t - MODEL_Metrics$t_minpost)
+# # MODEL_Metrics$perc_t_minpost <- (MODEL_Metrics$t_minpost - 450) / 450
+# # ## Make recovery and resistance outcomes
+# # Bayes_df <- MODEL_Metrics[MODEL_Metrics$survival == 1, ] # select only survived runs, others cannot experience evores
+# # Bayes_df$Recovery <- (Bayes_df$perc_maxpostpre + Bayes_df$perc_t_maxpost) / 2 # recovery is mean of percentage change in abundance and time it took to get there
+# # Bayes_df$Resistance <- (Bayes_df$perc_minpost * Bayes_df$perc_t_minpost) / 2 # same as above
 
-## Data Limiting ----------------------------------------------------------
-MODEL_Metrics <- MODEL_Metrics[MODEL_Metrics$pert >= 9, ]
-MODEL_Metrics <- MODEL_Metrics[MODEL_Metrics$MU == 0, ]
+# Bayes_df <- MODEL_Metrics[MODEL_Metrics$DI == 2 & MODEL_Metrics$pert.name >= 9 & MODEL_Metrics$SL == "1.0", ]
+# colnames(Bayes_df) <- gsub(pattern = " ", replacement = "_", colnames(Bayes_df))
 
-# MODEL_Metrics <- MODEL_Metrics[MODEL_Metrics$AC == 1, ]
-# MODEL_Metrics <- MODEL_Metrics[MODEL_Metrics$DI == 2, ]
+# ## subset for MU
+# Bayes_df_mu0 <- Bayes_df[Bayes_df$MU == 0, ]
+# Bayes_df_mu1 <- Bayes_df[Bayes_df$MU == 1, ]
+# Data_ls <- list(Mu0 = Bayes_df_mu0, Mu1 = Bayes_df_mu1)
 
-# MODELS ==================================================================
-summary(
-    lm(Res_Magnitude ~ 0 + DI, data = MODEL_Metrics)
-)
-
+# # MODELS ==================================================================
 
 # ## Initial Models of Simulation Settings on Primary Outcomes --------------
 # Outcomes_Primary <- c(
@@ -225,6 +249,73 @@ summary(
 # lapply(InitialModels_ls[[1]], "[[", "R2")
 # lapply(InitialModels_ls[[2]], "[[", "R2")
 
+
+# # ## Logistic Models of Evolutionary Rescue -----------------------
+# # Logit_df <- Bayes_df[Bayes_df$SuffDip != "Insufficient Population Crash", ]
+# # Logit_df$EvoRes <- Logit_df$EvoRes == "TRUE"
+# # logit_model <- glm(EvoRes ~ AC + DI + MU + SL + VA, data = Logit_df, family = binomial)
+# # summary(logit_model)
+
+# # ## Continuous Models of Resistance and Recovery -----------------------
+# # ### Model Building Functions ------------
+# # generate_valid_subsets <- function(vec) {
+# #     base_terms <- vec[!grepl(":", vec)] # Get individual terms
+# #     all_subsets <- list()
+
+# #     for (term in vec) {
+# #         new_vec <- setdiff(vec, term) # Remove one term
+
+# #         # Identify removed base terms
+# #         removed_base <- setdiff(base_terms, new_vec)
+
+# #         # Remove any interaction terms that contain removed base terms
+# #         valid_vec <- new_vec[!sapply(new_vec, function(x) any(strsplit(x, ":")[[1]] %in% removed_base))]
+
+# #         all_subsets <- append(all_subsets, list(valid_vec))
+# #     }
+
+# #     return(all_subsets)
+# # }
+
+# # do_model_selection <- function(model, terms, data = Bayes_df, mode = c("FORWARD", "BACKWARD")) {
+# #     BestBIC <- CurBIC <- BIC(model)
+
+# #     while (TRUE) {
+# #         CurBIC <- BIC(model)
+
+# #         if (mode == "FORWARD") {
+# #             trialterms <- terms[terms %nin% attr(terms(model), "term.labels")]
+# #             newformulae <- as.list(
+# #                 c(
+# #                     paste(as.character(formula(model)), trialterms, sep = "+"),
+# #                     paste(as.character(formula(model)), trialterms, sep = "*")
+# #                 )
+# #             )
+# #         }
+# #         if (mode == "BACKWARD") {
+# #             Curterms <- attr(terms(model), "term.labels")
+# #             Curterms <- generate_valid_subsets(Curterms)
+# #             newformulae <- lapply(Curterms, function(termsiter) {
+# #                 paste(all.vars(formula(model))[1], paste(termsiter, collapse = "+"), sep = "~")
+# #             })
+# #         }
+
+# #         newmodels <- lapply(newformulae, FUN = function(formulatry) {
+# #             updated_model <- update(model, as.formula(formulatry))
+# #         })
+
+# #         NewModPos <- which.min(unlist(lapply(newmodels, BIC)))
+
+# #         BestBIC <- BIC(newmodels[[NewModPos]])
+# #         if (BestBIC > CurBIC) {
+# #             print("Best model reached")
+# #             break()
+# #         }
+# #         model <- newmodels[[NewModPos]]
+# #         print(as.character(formula(model)))
+# #     }
+# #     return(model)
+# # }
 
 # # ### Resistance ------------
 # # base_formula <- "pert.name + AC + SL + DI + VA +
