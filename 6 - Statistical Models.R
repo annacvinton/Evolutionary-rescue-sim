@@ -247,7 +247,7 @@ IterData_ls <- lapply(Combinations, FUN = function(Combination) {
             geom_bar(stat = "identity", aes(fill = P_values < 0.05)) +
             labs(x = "Driver", y = "Estimate", title = paste("Outcome:", Outcome, "; Combination:", Combination)) +
             geom_errorbar(aes(ymin = Estimates - StError, ymax = Estimates + StError), width = 0.5) +
-            scale_fill_manual(values = rev(c("red", "blue")), name = "Significant") +
+            scale_fill_manual(values = c("TRUE" = "forestgreen", "FALSE" = "darkred"), name = "Significant") +
             # lims(y = c(0, NA)) +
             facet_wrap(~pert, ncol = 1) +
             theme_minimal() +
