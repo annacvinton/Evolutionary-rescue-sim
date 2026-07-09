@@ -43,7 +43,9 @@ package_vec <- c(
     "dplyr",
     "tidyr",
     "ggdist",
-    "MASS"
+    "MASS",
+    "stringr",
+    "gridExtra"
 )
 sapply(package_vec, install.load.package)
 
@@ -159,237 +161,103 @@ MODEL_Metrics <- MODEL_Metrics[MODEL_Metrics$MU == 0, ]
 # MODEL_Metrics <- MODEL_Metrics[MODEL_Metrics$DI == 2, ]
 
 # MODELS ==================================================================
-summary(
-    lm(Res_Magnitude ~ 0 + DI, data = MODEL_Metrics)
+Outcomes <- c("Res_Magnitude", "Res_Speed", "Rec_Magnitude", "Rec_Speed")
+Parameters <- c("AC", "DI", "SL", "VA")
+Combinations <- c(
+    "DI = 1.5, SL = 1.2, VA = 50",
+    "DI = 1.5, SL = 1.2, VA = 100",
+    "DI = 2, SL = 1, VA = 100",
+    "DI = 2, AC = 1|2, VA = 25|50|100",
+    "AC = 0, DI = 2, SL = 1"
 )
 
+subset_by_combination <- function(df, combination) {
+    parts <- strsplit(combination, split = ",\\s*")[[1]]
+    keep <- rep(TRUE, nrow(df))
 
-# ## Initial Models of Simulation Settings on Primary Outcomes --------------
-# Outcomes_Primary <- c(
-#     "Res_Mag_Immediate",
-#     "Res_Mag_Delayed",
-#     "Res_Speed_Delayed",
-#     "Rec_Mag_PreBase",
-#     "Rec_Speed_PreBase",
-#     "Rec_Mag_PostBase",
-#     "Rec_Speed_PostBase"
-# )
+    for (part in parts) {
+        kv <- strsplit(part, split = "\\s*=\\s*")[[1]]
+        parameter <- trimws(kv[1])
+        values <- trimws(strsplit(kv[2], split = "\\|")[[1]])
+        values <- suppressWarnings(as.numeric(values))
+        values <- values[!is.na(values)]
 
-# InitialModels_ls <- lapply(names(Data_ls), FUN = function(Mu_iter) {
-#     # Mu_iter <- "Mu0"
-#     Data_iter <- Data_ls[[Mu_iter]]
-#     Outcome_draws <- lapply(Outcomes_Primary, FUN = function(Outcome) {
-#         # Outcome <- "Res_Mag_Immediate"
-#         colnames(Data_iter)[colnames(Data_iter) == Outcome] <- "Outcome"
-#         print(Outcome)
-#         # print(summary(Data_iter$Outcome))
-#         # Pert_draws <- lapply(sort(unique(Data_iter$pert.name)), FUN = function(pert) {
-#         #     print(pert)
-#         # pert <- 14
-#         # Data_iter <- Data_iter[Data_iter$pert.name == pert, ]
-#         if (grepl(Outcome, pattern = "Speed") | grepl(Outcome, pattern = "Res")) {
-#             Data_iter <- Data_iter[Data_iter$Outcome <= 1, ] # these are definitive outliers
-#             fit <- betareg(Outcome ~ pert.name + AC * VA, data = Data_iter)
-#             R2 <- summary(fit)$pseudo.r.squared
-#         } else {
-#             fit <- glm(Outcome ~ pert.name + AC * VA, data = Data_iter, family = Gamma(link = "log"))
-#             ll_full <- logLik(fit)
-#             ll_null <- logLik(glm(Outcome ~ 1, data = Data_iter, family = Gamma(link = "log")))
-#             R2 <- 1 - as.numeric(ll_full / ll_null)
-#         }
-#         # Extract coefficients and covariance matrix
-#         coef_est <- coef(fit)
-#         vcov_mat <- vcov(fit)
-#         # Simulate 1000 draws from multivariate normal
-#         set.seed(42)
-#         sim_coefs <- MASS::mvrnorm(5000, mu = coef_est, Sigma = vcov_mat) %>%
-#             as.data.frame()
-#         # Convert to long format for ggdist
-#         sim_long <- sim_coefs %>%
-#             pivot_longer(everything(), names_to = "term", values_to = "value")
+        keep <- keep & df[[parameter]] %in% values
+    }
 
-#         if (class(fit)[1] != "betareg") { # adjustment needed for log link
-#             sim_long <- sim_long %>%
-#                 mutate(value = exp(value))
-#         }
-#         list(coeffs = sim_long, R2 = R2)
-#         # })
-#         # names(Pert_draws) <- sort(unique(Data_iter$pert.name))
-#         # Pert_draws
-#     })
-#     names(Outcome_draws) <- Outcomes_Primary
-#     Outcome_draws
-# })
-# names(InitialModels_ls)
+    df[keep, , drop = FALSE]
+}
 
-# lapply(InitialModels_ls[[1]], "[[", "R2")
-# lapply(InitialModels_ls[[2]], "[[", "R2")
+## Iterate over combinations and identify outcome as the parameter not listed
+IterData_ls <- lapply(Combinations, FUN = function(Combination) {
+    # Combination <- Combinations[4]
+    print(Combination)
 
+    ## identify driver parameter for model
+    DriverParam <- Parameters[!(sapply(Parameters, FUN = function(Parameter) {
+        # Parameter <- Parameters[1]
+        grepl(Parameter, Combination)
+    }))]
 
-# # ### Resistance ------------
-# # base_formula <- "pert.name + AC + SL + DI + VA +
-# #                 pert.name:AC + pert.name:SL + AC:SL + pert.name:DI +
-# #                 AC:DI + SL:DI + pert.name:VA + AC:VA + SL:VA + DI:VA +
-# #                 pert.name:AC:SL + pert.name:AC:DI + pert.name:SL:DI +
-# #                 AC:SL:DI + pert.name:AC:VA + pert.name:SL:VA + AC:SL:VA +
-# #                 pert.name:DI:VA + AC:DI:VA + SL:DI:VA + pert.name:AC:SL:DI +
-# #                 pert.name:AC:SL:VA + pert.name:AC:DI:VA + pert.name:SL:DI:VA +
-# #                 AC:SL:DI:VA + pert.name:AC:SL:DI:VA"
+    IterData <- subset_by_combination(MODEL_Metrics, Combination)
 
+    ## Iterate over outcome variables and produce plots facetted by perturbation level
+    OutcomePlots_ls <- pblapply(Outcomes, FUN = function(Outcome) {
+        # Outcome <- "Rec_Magnitude"
+        # print(Outcome)
+        Coeffs_df <- lapply(sort(unique(MODEL_Metrics$pert)), FUN = function(pert) {
+            # pert <- 15
+            # print(pert)
+            IterData <- IterData[IterData$pert == pert, ]
+            n_runs <- length(unique(IterData$rep))
+            LinMod <- tryCatch(
+                {
+                    LinMod <- lm(
+                        as.formula(paste0(Outcome, " ~ 0 + ", DriverParam)),
+                        data = IterData
+                    )
+                },
+                error = function(e) {
+                    # message("Error in lm for pert: ", pert, " - ", e$message)
+                    return(NULL)
+                }
+            )
 
-# # #### MU0 ###########
-# # message("Resistance MU 1")
-# # resist_fwd_mu0 <- do_model_selection(
-# #     data = Bayes_df_mu0,
-# #     terms = all.vars(formula(paste0("test ~", base_formula)))[-1],
-# #     model = betareg(formula(paste("Resistance ~", base_formula)),
-# #         data = Bayes_df_mu0, na.action = "na.fail"
-# #     ),
-# #     mode = "BACKWARD"
-# # )
+            if (is.null(LinMod)) {
+                return(NULL)
+            }
 
-# # resist_bkw_mu0 <- do_model_selection(
-# #     data = Bayes_df_mu0,
-# #     terms = all.vars(formula(paste0("test ~", base_formula)))[-1],
-# #     model = betareg(formula(paste("Resistance ~", 1)),
-# #         data = Bayes_df_mu0, na.action = "na.fail"
-# #     ),
-# #     mode = "FORWARD"
-# # )
+            # extract coefficients and p-values
+            LinMod_summary <- summary(LinMod)
+            CoeffNames <- rownames(LinMod_summary$coefficients) # Coefficient names
+            estimates <- LinMod_summary$coefficients[, 1] # Coefficients
+            StdError <- LinMod_summary$coefficients[, 2] # Standard errors
+            pvals <- LinMod_summary$coefficients[, 4] # p-values
 
-# # resist_mu0 <- list(FWD = resist_fwd_mu0, BKW = resist_bkw_mu0)[[
-# #     which.min(unlist(lapply(list(FWD = resist_fwd_mu0, BKW = resist_bkw_mu0), BIC)))
-# # ]]
-# # print(r2(resist_mu0))
+            plot_df <- data.frame(
+                Coefficients = CoeffNames, Estimates = estimates, P_values = pvals, StError = StdError,
+                pert = paste("Perturbation: ", str_pad(pert, 2, "left", "0"), "; # of Simulations: ", n_runs, sep = "")
+            )
 
-# # #### MU1 ###########
-# # message("Resistance MU 1")
-# # resist_fwd_mu1 <- do_model_selection(
-# #     data = Bayes_df_mu1,
-# #     terms = all.vars(formula(paste0("test ~", base_formula)))[-1],
-# #     model = betareg(formula(paste("Resistance ~", base_formula)),
-# #         data = Bayes_df_mu1, na.action = "na.fail"
-# #     ),
-# #     mode = "BACKWARD"
-# # )
+            plot_df
+        })
+        Coeffs_df <- do.call(rbind, Coeffs_df[!unlist(lapply(Coeffs_df, is.null))])
 
-# # resist_bkw_mu1 <- do_model_selection(
-# #     data = Bayes_df_mu1,
-# #     terms = all.vars(formula(paste0("test ~", base_formula)))[-1],
-# #     model = betareg(formula(paste("Resistance ~", 1)),
-# #         data = Bayes_df_mu1, na.action = "na.fail"
-# #     ),
-# #     mode = "FORWARD"
-# # )
+        ggplot(Coeffs_df, aes(x = Coefficients, y = Estimates)) +
+            geom_bar(stat = "identity", aes(fill = P_values < 0.05)) +
+            labs(x = "Driver", y = "Estimate", title = paste("Outcome:", Outcome, "; Combination:", Combination)) +
+            geom_errorbar(aes(ymin = Estimates - StError, ymax = Estimates + StError), width = 0.5) +
+            scale_fill_manual(values = rev(c("red", "blue")), name = "Significant") +
+            # lims(y = c(0, NA)) +
+            facet_wrap(~pert, ncol = 1) +
+            theme_minimal() +
+            theme(legend.position = "bottom", text = element_text(size = 20))
+    })
 
-# # resist_mu1 <- list(FWD = resist_fwd_mu1, BKW = resist_bkw_mu1)[[
-# #     which.min(unlist(lapply(list(FWD = resist_fwd_mu1, BKW = resist_bkw_mu1), BIC)))
-# # ]]
-# # print(r2(resist_mu1))
-
-# # ### Recovery ------------
-# # formula_obj <- as.formula(Test ~ pert.name * AC * SL * DI * VA *
-# #     pre_u_sd * Resistance * c(pre_u_sd - postmin_u_sd))
-
-# # # [Environment] Post vs. [Individuals] PostMin_Closest_dist_mean
-# # # [Environment] Pre vs. [Individuals] Pre_Closest_dist_mean
-
-# # terms_obj <- terms(formula_obj)
-# # # Get the terms as a character vector
-# # all_terms <- attr(terms_obj, "term.labels")
-
-# # base_formula <- paste(all_terms, collapse = "+")
-
-# # #### MU0 ###########
-# # message("Recovery MU 0")
-# # recov_fwd_mu0 <- do_model_selection(
-# #     data = Bayes_df_mu0,
-# #     terms = all.vars(formula(paste0("test ~", base_formula)))[-1],
-# #     glm(formula(paste("Recovery ~", base_formula)), data = Bayes_df_mu0, family = Gamma(link = "log")),
-# #     mode = "BACKWARD"
-# # )
-
-# # recov_bkw_mu0 <- do_model_selection(
-# #     data = Bayes_df_mu0,
-# #     terms = all.vars(formula(paste0("test ~", base_formula)))[-1],
-# #     glm(formula(paste("Recovery ~", 1)), data = Bayes_df_mu0, family = Gamma(link = "log")),
-# #     mode = "FORWARD"
-# # )
-
-# # recov_mu0 <- list(FWD = recov_fwd_mu0, BKW = recov_bkw_mu0)[[
-# #     which.min(unlist(lapply(list(FWD = recov_fwd_mu0, BKW = recov_bkw_mu0), BIC)))
-# # ]]
-# # print(r2(recov_mu0))
-
-# # #### MU1 ###########
-# # message("Recovery MU 1")
-# # recov_fwd_mu1 <- do_model_selection(
-# #     data = Bayes_df_mu1,
-# #     terms = all.vars(formula(paste0("test ~", base_formula)))[-1],
-# #     glm(formula(paste("Recovery ~", base_formula)), data = Bayes_df_mu1, family = Gamma(link = "log")),
-# #     mode = "BACKWARD"
-# # )
-
-# # recov_bkw_mu1 <- do_model_selection(
-# #     data = Bayes_df_mu1,
-# #     terms = all.vars(formula(paste0("test ~", base_formula)))[-1],
-# #     glm(formula(paste("Recovery ~", 1)), data = Bayes_df_mu1, family = Gamma(link = "log")),
-# #     mode = "FORWARD"
-# # )
-
-# # recov_mu1 <- list(FWD = recov_fwd_mu1, BKW = recov_bkw_mu1)[[
-# #     which.min(unlist(lapply(list(FWD = recov_fwd_mu1, BKW = recov_bkw_mu1), BIC)))
-# # ]]
-# # print(r2(recov_mu1))
-
-
-# # # VISUALISATION =============================
-# # stop("INSEPCT")
-
-# # ## plots of coefficients
-# # library(tidyr)
-
-# # ModelCoeff_ls <- list(
-# #     Mu0 = summary(recov_mu0[[1]])$coefficients,
-# #     Mu1 = summary(recov_mu1[[1]])$coefficients
-# # )
-
-# # PlotCoeffs_ls <- lapply(1:length(ModelCoeff_ls), FUN = function(mat) {
-# #     Name <- names(ModelCoeff_ls)[mat]
-# #     mat <- ModelCoeff_ls[[mat]]
-# #     ret <- as.data.frame(mat) %>%
-# #         tibble::rownames_to_column("row_name") %>% # Add row names as a column
-# #         pivot_longer(
-# #             cols = -row_name, # All columns except the row_name column
-# #             names_to = "column_name", # Name for new column storing column names
-# #             values_to = "value" # Name for new column storing values
-# #         )
-# #     ret$model <- Name
-# #     ret
-# # })
-# # PlotCoeffs_df <- do.call(rbind, PlotCoeffs_ls)
-
-# # # Filter rows for "Estimate" and "Std. Error", then reshape the data
-# # library(dplyr)
-# # library(tidyr)
-# # plot_data <- PlotCoeffs_df %>%
-# #     filter(column_name %in% c("Estimate", "Std. Error")) %>%
-# #     pivot_wider(names_from = column_name, values_from = value) %>%
-# #     mutate(
-# #         lower_bound = Estimate - 0.5 * `Std. Error`, # Lower range
-# #         upper_bound = Estimate + 0.5 * `Std. Error` # Upper range
-# #     )
-
-# # # Plot the estimates with error bars
-# # ggplot(plot_data, aes(x = Estimate, y = model)) +
-# #     geom_point(size = 5) + # Point for the estimate
-# #     geom_errorbar(aes(xmin = lower_bound, xmax = upper_bound), width = 0.2) + # Error bars
-# #     # labs(
-# #     #   title = "Estimate with Range (± Half Std. Error)",
-# #     #   y = "Parameter",
-# #     #   x = "Estimate"
-# #     # ) +
-# #     geom_vline(xintercept = 0) +
-# #     facet_wrap(~row_name, ncol = 1, scales = "free_x") +
-# #     theme_minimal()
-# # ggsave(file.path(getwd(), "Exports/GLMCoeffs_Recovery.jpg"), width = 9, height = 90, units = "cm")
+    ## save plots into one PDF file
+    ggsave(
+        filename = file.path(Dir.Exports, paste0("OutcomePlots_", gsub("[^A-Za-z0-9]", "_", Combination), ".pdf")),
+        plot = marrangeGrob(grobs = OutcomePlots_ls, nrow = 2, ncol = 2),
+        width = 42, height = 42
+    )
+})
