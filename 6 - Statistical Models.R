@@ -243,21 +243,38 @@ IterData_ls <- lapply(Combinations, FUN = function(Combination) {
         })
         Coeffs_df <- do.call(rbind, Coeffs_df[!unlist(lapply(Coeffs_df, is.null))])
 
-        ggplot(Coeffs_df, aes(x = Coefficients, y = Estimates)) +
-            geom_bar(stat = "identity", aes(fill = P_values < 0.05)) +
-            labs(x = "Driver", y = "Estimate", title = paste("Outcome:", Outcome, "; Combination:", Combination)) +
-            geom_errorbar(aes(ymin = Estimates - StError, ymax = Estimates + StError), width = 0.5) +
-            scale_fill_manual(values = c("TRUE" = "forestgreen", "FALSE" = "darkred"), name = "Significant") +
-            # lims(y = c(0, NA)) +
-            facet_wrap(~pert, ncol = 1) +
-            theme_minimal() +
-            theme(legend.position = "bottom", text = element_text(size = 20))
+        return(
+            list(
+                data = Coeffs_df,
+                plot = ggplot(Coeffs_df, aes(x = Coefficients, y = Estimates)) +
+                    geom_bar(stat = "identity", aes(fill = P_values < 0.05)) +
+                    labs(x = "Driver", y = "Estimate", title = paste("Outcome:", Outcome, "; Combination:", Combination)) +
+                    geom_errorbar(aes(ymin = Estimates - StError, ymax = Estimates + StError), width = 0.5) +
+                    scale_fill_manual(values = c("TRUE" = "forestgreen", "FALSE" = "darkred"), name = "Significant") +
+                    # lims(y = c(0, NA)) +
+                    facet_wrap(~pert, ncol = 1) +
+                    theme_minimal() +
+                    theme(legend.position = "bottom", text = element_text(size = 20))
+            )
+        )
     })
+
+    ## save coefficients into one xlsx file with one sheet per outcome variable
+    data_ls <- lapply(OutcomePlots_ls, "[[", "data")
+    names(data_ls) <- Outcomes
+    openxlsx::write.xlsx(data_ls, file = file.path(Dir.Exports, paste0("OutcomeCoefficients_", gsub("[^A-Za-z0-9]", "_", Combination), ".xlsx")))
 
     ## save plots into one PDF file
     ggsave(
         filename = file.path(Dir.Exports, paste0("OutcomePlots_", gsub("[^A-Za-z0-9]", "_", Combination), ".pdf")),
-        plot = marrangeGrob(grobs = OutcomePlots_ls, nrow = 2, ncol = 2),
+        plot = marrangeGrob(grobs = lapply(OutcomePlots_ls, "[[", "plot"), nrow = 2, ncol = 2),
+        width = 42, height = 42
+    )
+
+    ## save plots into one PNG file
+    ggsave(
+        filename = file.path(Dir.Exports, paste0("OutcomePlots_", gsub("[^A-Za-z0-9]", "_", Combination), ".png")),
+        plot = marrangeGrob(grobs = lapply(OutcomePlots_ls, "[[", "plot"), nrow = 2, ncol = 2),
         width = 42, height = 42
     )
 })
