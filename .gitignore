@@ -42,11 +42,14 @@ vignettes/*.pdf
 Data/*
 DISCARD/*
 Logo/*
-Exports/*
+# Exports/*
 Icon*
 Manuscript/
 EvoResHPC
 OLD Scripts/*
+Exports/BEAST/*.RData
+BEAST_ChangePoints.RData
+POPULATION_TimeStep.RData
 
 *.Rproj
 *.DS_Store
