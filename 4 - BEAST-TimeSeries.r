@@ -43,8 +43,29 @@ sapply(package_vec, install.load.package)
 load(file.path(Dir.Exports, "POPULATION_TimeStep.RData")) # loads Data_df
 ID_vec <- unique(Data_df$ID)
 
+## Conditions, time and survival of runs -----------------------------------
+conditions <- Data_df[, c("pert.name", "rep", "AC", "DI", "SL", "VA", "MU")]
+conditions <- conditions[which(!duplicated(conditions)), ]
+# runtimes <- aggregate(Data_df, t ~ pert.name + rep + AC + DI + MU + SL + VA, FUN = max)
+runtimes <- aggregate(Data_df, t ~ ID, FUN = max)
+runtimes <- cbind(runtimes, do.call(
+    rbind,
+    pblapply(runtimes$ID, function(id) {
+        # print(id)
+        x <- Data_df[which(Data_df$ID == id), c("pert.name", "rep", "AC", "DI", "SL", "VA", "MU", "n", "t")]
+        if (460 %in% x$t) {
+            x$pre_n <- x$n[x$t == 460]
+        } else {
+            x$pre_n <- NA
+        }
+        x <- x[1, c("pert.name", "rep", "AC", "DI", "SL", "VA", "MU", "pre_n")]
+        x$survival <- ifelse(runtimes$t[runtimes$ID == id] < 1110, FALSE, TRUE)
+        return(x)
+    })
+))
+
 # MODELS ==================================================================
-cl <- parallel::makeCluster(floor(parallel::detectCores() / 2))
+cl <- parallel::makeCluster(ifelse(parallel::detectCores() > 30, 30, parallel::detectCores()))
 clusterExport(cl = cl, varlist = c("Dir.Data", "Dir.Exports", "Dir.Beast", "install.load.package", "package_vec", "Data_df", "ID_vec"))
 clusterpacks <- clusterCall(cl, function() sapply(package_vec, install.load.package))
 
@@ -105,16 +126,16 @@ Model_ls <- pblapply(
 
 
         ## subset to change-points only starting when the perturbation is introduced at t = 460
-        after450 <- cp > 450 # a changepoint at 460 denotes basically immediate extinction
-        if (sum(after450) == 0) {
+        after460 <- cp > 460 # a changepoint at 460 denotes basically immediate extinction
+        if (sum(after460) == 0) {
             return(NULL)
         }
-        cp <- cp[after450]
-        cpPr <- cpPr[after450]
+        cp <- cp[after460]
+        cpPr <- cpPr[after460]
         if (is.null(nrow(cpCI))) {
             cpCI <- data.frame(cpCI[1], cpCI[2])
         } else {
-            cpCI <- cpCI[after450, ]
+            cpCI <- cpCI[after460, ]
         }
 
         ## order change-points by their occurrence in time
@@ -160,8 +181,69 @@ Model_ls <- pblapply(
     }
 )
 BEAST_ChangePoints_df <- do.call(rbind, Model_ls[sapply(Model_ls, function(x) if (!is.null(x)) TRUE else FALSE)])
-
-dim(BEAST_ChangePoints_df)
-head(BEAST_ChangePoints_df)
-
 save(BEAST_ChangePoints_df, file = file.path(Dir.Exports, "BEAST_ChangePoints.RData"))
+
+BEAST_ChangePoints_df$ID <- with(BEAST_ChangePoints_df, paste(AC, DI, MU, SL, VA, pert.name, rep, sep = "-"))
+
+med_n_chps <- aggregate(data = BEAST_ChangePoints_df, n ~ changePoint + ID, FUN = median)
+med_t_chps <- aggregate(data = BEAST_ChangePoints_df, posteriorSample ~ changePoint + ID, FUN = median)
+sd_n_chps <- aggregate(data = BEAST_ChangePoints_df, n ~ changePoint + ID, FUN = sd)
+sd_t_chps <- aggregate(data = BEAST_ChangePoints_df, posteriorSample ~ changePoint + ID, FUN = sd)
+
+Chps_summary_df <- pblapply(runtimes$ID, function(id) {
+    # id <- runtimes$ID[2]
+    if (!id %in% med_n_chps$ID) {
+        return(
+            data.frame(
+                CP1_n = NA,
+                CP1_n_sd = NA,
+                CP1_t = NA,
+                CP1_t_sd = NA,
+                CP2_n = NA,
+                CP2_n_sd = NA,
+                CP2_t = NA,
+                CP2_t_sd = NA,
+                ID = id
+            )
+        )
+    }
+    CP1_n <- med_n_chps[which(med_n_chps$ID == id & med_n_chps$changePoint == 1), "n"]
+    CP2_n <- med_n_chps[which(med_n_chps$ID == id & med_n_chps$changePoint == 2), "n"]
+    CP1_n_sd <- sd_n_chps[which(sd_n_chps$ID == id & sd_n_chps$changePoint == 1), "n"]
+    CP2_n_sd <- sd_n_chps[which(sd_n_chps$ID == id & sd_n_chps$changePoint == 2), "n"]
+    CP1_t <- med_t_chps[which(med_t_chps$ID == id & med_t_chps$changePoint == 1), "posteriorSample"]
+    CP2_t <- med_t_chps[which(med_t_chps$ID == id & med_t_chps$changePoint == 2), "posteriorSample"]
+    CP1_t_sd <- sd_t_chps[which(sd_t_chps$ID == id & sd_t_chps$changePoint == 1), "posteriorSample"]
+    CP2_t_sd <- sd_t_chps[which(sd_t_chps$ID == id & sd_t_chps$changePoint == 2), "posteriorSample"]
+    data.frame(
+        CP1_n = ifelse(length(CP1_n) == 0, NA, CP1_n),
+        CP1_n_sd = ifelse(length(CP1_n_sd) == 0, NA, CP1_n_sd),
+        CP1_t = ifelse(length(CP1_t) == 0, NA, CP1_t),
+        CP1_t_sd = ifelse(length(CP1_t_sd) == 0, NA, CP1_t_sd),
+        CP2_n = ifelse(length(CP2_n) == 0, NA, CP2_n),
+        CP2_n_sd = ifelse(length(CP2_n_sd) == 0, NA, CP2_n_sd),
+        CP2_t = ifelse(length(CP2_t) == 0, NA, CP2_t),
+        CP2_t_sd = ifelse(length(CP2_t_sd) == 0, NA, CP2_t_sd),
+        ID = id
+    )
+})
+Chps_summary_df <- do.call(rbind, Chps_summary_df)
+
+tail(Chps_summary_df)
+
+MODEL_Metrics <- merge(
+    x = runtimes,
+    y = Chps_summary_df,
+    by = "ID",
+    all.x = TRUE
+)
+colnames(MODEL_Metrics)[which(colnames(MODEL_Metrics) == "t")] <- "t_max"
+
+MODEL_Metrics$Res_Magnitude <- (MODEL_Metrics$CP1_n - MODEL_Metrics$pre_n) / MODEL_Metrics$pre_n
+MODEL_Metrics$Res_Speed <- MODEL_Metrics$CP1_t - 460
+MODEL_Metrics$Rec_Magnitude <- (MODEL_Metrics$CP2_n - MODEL_Metrics$CP1_n) / MODEL_Metrics$CP1_n
+MODEL_Metrics$Rec_Speed <- MODEL_Metrics$CP2_t - MODEL_Metrics$CP1_t
+MODEL_Metrics$Rec_MagnitudePre <- (MODEL_Metrics$CP2_n - MODEL_Metrics$pre_n) / MODEL_Metrics$pre_n
+MODEL_Metrics$Rec_SpeedPre <- MODEL_Metrics$CP2_t - 460
+
+save(MODEL_Metrics, file = file.path(Dir.Exports, "ModelMetrics.RData"))

@@ -46,6 +46,7 @@ Exports/*
 Icon*
 Manuscript/
 EvoResHPC
+OLD Scripts/*
 
 *.Rproj
 *.DS_Store
