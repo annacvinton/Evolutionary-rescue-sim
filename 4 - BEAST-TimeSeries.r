@@ -51,14 +51,16 @@ runtimes <- aggregate(Data_df, t ~ ID, FUN = max)
 runtimes <- cbind(runtimes, do.call(
     rbind,
     pblapply(runtimes$ID, function(id) {
-        # print(id)
-        x <- Data_df[which(Data_df$ID == id), c("pert.name", "rep", "AC", "DI", "SL", "VA", "MU", "n", "t")]
+        # id <- runtimes$ID[1]
+        x <- Data_df[which(Data_df$ID == id), c("pert.name", "rep", "AC", "DI", "SL", "VA", "MU", "n", "t", "u_sd")]
         if (460 %in% x$t) {
-            x$pre_n <- x$n[x$t == 460]
+            x$pre_n <- x$n[which(x$t == 460)]
+            x$pre_u_sd <- x$u_sd[which(x$t == 460)]
         } else {
             x$pre_n <- NA
+            x$pre_u_sd <- NA
         }
-        x <- x[1, c("pert.name", "rep", "AC", "DI", "SL", "VA", "MU", "pre_n")]
+        x <- x[1, c("pert.name", "rep", "AC", "DI", "SL", "VA", "MU", "pre_n", "pre_u_sd")]
         x$survival <- ifelse(runtimes$t[runtimes$ID == id] < 1110, FALSE, TRUE)
         return(x)
     })
@@ -182,6 +184,7 @@ Model_ls <- pblapply(
 )
 BEAST_ChangePoints_df <- do.call(rbind, Model_ls[sapply(Model_ls, function(x) if (!is.null(x)) TRUE else FALSE)])
 save(BEAST_ChangePoints_df, file = file.path(Dir.Exports, "BEAST_ChangePoints.RData"))
+# load(file.path(Dir.Exports, "BEAST_ChangePoints.RData"))
 
 BEAST_ChangePoints_df$ID <- with(BEAST_ChangePoints_df, paste(AC, DI, MU, SL, VA, pert.name, rep, sep = "-"))
 
@@ -228,8 +231,6 @@ Chps_summary_df <- pblapply(runtimes$ID, function(id) {
     )
 })
 Chps_summary_df <- do.call(rbind, Chps_summary_df)
-
-tail(Chps_summary_df)
 
 MODEL_Metrics <- merge(
     x = runtimes,
