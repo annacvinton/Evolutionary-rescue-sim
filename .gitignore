@@ -47,6 +47,7 @@ Icon*
 Manuscript/
 EvoResHPC
 OLD Scripts/*
+OLDER Scripts/*
 Exports/BEAST/*.RData
 BEAST_ChangePoints.RData
 POPULATION_TimeStep.RData
@@ -64,3 +65,4 @@ ModelMeeting.pptx
 .megaignore
 desktop.ini
 Rubbish/*
+all_results_combined.csv

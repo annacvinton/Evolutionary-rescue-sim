@@ -1,0 +1,6 @@
+"","slope","autocorrelation","patch_sd","dispersal","mutation","ac x severity","slope x severity"
+"resistance",2.9e-07,0.09626939,0.08190854,0,0,0.11609303,0
+"recovery magnitude",0,1e-08,0.03289178,0,0,0.89834169,0.13648413
+"recovery vs baseline",0,1e-08,0.02208437,0,0,0.78580848,0.08650977
+"recovery time",0,0,0.00142181,0,0,0.37075116,0.04767963
+"persistence",0,0,0,0,0,0.44088134,0.32365537
