@@ -1,11 +1,62 @@
 # =============================================================================
+# TODO
+# =============================================================================
+#' 1. Plot landscapes to show effects of simulation parameters and batches
+#' 2. Plot a few abundance curves to show how the simulation works over time
+#' 3. Re-do plots below with unified colour scheme
+
+library(ggplot2)
+library(viridis)
+
+# =============================================================================
 # DATA
 # =============================================================================
 source("analyse_sweep.R")
+simsteps_df <- read.csv("all_results_combined.csv")
+
+head(simsteps_df)
+simsteps_df$ID <- with(simsteps_df, paste(slope, disp, mutsd, pert_treat, patch_sd, ac, draw, batch, rep, sep = "_"))
+
+## find ID for which we have the most data points
+TargetID <- names(which.max(table(simsteps_df$ID)))
+
+plot_df <- simsteps_df[simsteps_df$ID == TargetID, ]
+plot(plot_df$t, plot_df$n, type = "l", xlab = "time", ylab = "abundance")
+
+
 
 # =============================================================================
 # PLOTS
 # =============================================================================
+
+## Landscapes ------------------------------
+LS_fs <- list.files(file.path(getwd(), "simulation", "landscapes"), pattern = ".txt")
+
+lapply(LS_fs, function(i) {
+    landscape <- read.table(file.path(getwd(), "simulation", "landscapes", i), header = FALSE)
+    landscape$x <- rep(1:100, each = 100)
+    landscape$y <- rep(1:100, times = 100)
+    # print(summary(landscape))
+    # # # convert 10000 entry long vector into 100x100 matrix
+    # landscape_matrix <- matrix(landscape$V1, nrow = 100, ncol = 100, byrow = TRUE)
+    # # image(landscape_matrix, axes = FALSE, col = hcl.colors(24, "Blues", rev = TRUE), main = title)
+    # file name contains information about the simulation parameters like so "L_ac0_sd0_r0.txt" for AC, SD, and R values of 0. We split these out to use as the title of the plot and name of the produced png file
+    title <- tools::file_path_sans_ext(gsub("L_", "", i))
+    ## plotting with ggplot2
+    p <- ggplot(landscape, aes(x = x, y = y, fill = V1)) +
+        geom_tile() +
+        scale_fill_viridis() +
+        labs(title = title, x = NULL, y = NULL) +
+        theme_bw() +
+        theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
+    save_path <- file.path(getwd(), "simulation", "landscapes", paste0(tools::file_path_sans_ext(i), ".png"))
+    ggsave(save_path, p, width = 5, height = 5, dpi = 300)
+})
+
+
+
+
+
 pal <- c("#1B9E9E", "#E08214", "#8DA0CB")
 setpar <- function(...) {
     par(
