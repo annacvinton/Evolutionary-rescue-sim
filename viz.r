@@ -56,13 +56,94 @@ mytheme <- theme_bw(base_size = 11) +
 
 # DATA ====================================================================
 message("Reading in data...")
-## Model Outputs ----------------------------------------------------------
-invisible(source("analyse_sweep.R"))
-#' registers:
-#' - d: run-level summary of all simulations
-#' - s: run-level summary of simulations where populations persisted
-#' - res: model results
-#' - out: effects table
+## Individual Runs --------------------------------------------------------
+simsteps_df <- read.csv("all_results_v2.csv")
+
+# PLOTTING ================================================================
+message("Plotting...")
+
+## Trajectories -----------------------------------------------------------
+args <- commandArgs(trailingOnly = TRUE)
+d <- read.csv(if (length(args)) args[1] else "traj_subset_v2.csv")
+
+TPERT <- min(d$t[d$pert_value > 0]) # when the shift fires
+
+# patch SD 0 is flat, so its autocorrelation label is meaningless: one condition
+d$cond <- ifelse(d$patch_sd == 0, "flat", paste0("ac", d$ac))
+d$run <- interaction(d$draw, d$batch, d$rep, drop = TRUE)
+
+conds <- c("flat", "ac0", "ac2", "ac4")
+titles <- c(
+    "flat landscape", "rough, uncorrelated", "rough, intermediate",
+    "rough, correlated"
+)
+pal_traj <- c("#666666", pal)
+
+## gplot counterpart
+d$cond_f <- factor(d$cond, levels = conds, labels = titles)
+d$n_plot <- pmax(d$n, 1)
+pal_named <- setNames(pal_traj, titles)
+
+med_n <- aggregate(n_plot ~ cond_f + t, data = d, FUN = median)
+med_u <- aggregate(u_sd ~ cond_f + t, data = d, FUN = median, na.rm = TRUE)
+
+last <- do.call(rbind, lapply(
+    split(d, interaction(d$run, d$cond_f, drop = TRUE)),
+    function(q) q[which.max(q$t), ]
+))
+persist <- aggregate(cbind(persisted = n > 10) ~ cond_f, data = last, FUN = mean)
+persist$label <- sprintf("%.0f%% persist", 100 * persist$persisted)
+
+pert_label <- data.frame(
+    cond_f = factor(titles[1], levels = titles),
+    t = TPERT + 20, y = 1600, lab = "perturbation"
+)
+
+p_top <- ggplot(d, aes(t, n_plot, color = cond_f)) +
+    geom_vline(xintercept = TPERT, color = "#cc3333", linewidth = 0.6, linetype = 2) +
+    geom_line(aes(group = run, alpha = "individual runs"), linewidth = 0.35, show.legend = TRUE) +
+    geom_line(data = med_n, aes(t, n_plot, alpha = "median"), linewidth = 1) +
+    geom_text(
+        data = pert_label, aes(t, y, label = lab), color = "#cc3333",
+        hjust = 0, size = 2.6, inherit.aes = FALSE
+    ) +
+    facet_wrap(~cond_f, nrow = 1) +
+    scale_y_log10(limits = c(1, 2000)) +
+    scale_x_continuous(limits = c(0, 810)) +
+    scale_color_manual(values = pal_named, guide = "none") +
+    scale_alpha_manual(
+        name = NULL, values = c("individual runs" = .15, "median" = 1),
+        guide = guide_legend(override.aes = list(linewidth = c(.6, 1.2), color = "grey30"))
+    ) +
+    labs(x = NULL, y = "population size") +
+    theme_bw(base_size = 11) +
+    theme(
+        strip.background = element_rect(fill = "grey92", color = NA),
+        panel.grid.minor = element_blank(),
+        legend.position = "inside", legend.position.inside = c(.99, .02),
+        legend.justification = c(1, 0), legend.background = element_blank()
+    )
+
+p_bottom <- ggplot(d, aes(t, u_sd, color = cond_f)) +
+    geom_vline(xintercept = TPERT, color = "#cc3333", linewidth = 0.6, linetype = 2) +
+    geom_line(aes(group = run), alpha = .15, linewidth = 0.35) +
+    geom_line(data = med_u, aes(t, u_sd), linewidth = 1) +
+    geom_label(data = persist, aes(x = 750, y = 39, label = label), size = 2.6, hjust = 1) +
+    facet_wrap(~cond_f, nrow = 1) +
+    scale_y_continuous(limits = c(0, 42)) +
+    scale_x_continuous(limits = c(0, 810)) +
+    scale_color_manual(values = pal_named, guide = "none") +
+    labs(x = "time", y = "trait SD") +
+    theme_bw(base_size = 11) +
+    theme(strip.text = element_blank(), panel.grid.minor = element_blank())
+
+fig <- p_top / p_bottom +
+    plot_annotation(
+        title = "Population size (top) and trait variation (bottom) through a perturbation",
+        theme = theme(plot.title = element_text(hjust = .5, size = 11, color = "#333333"))
+    )
+# fig
+ggsave(fig, filename = file.path(Dir.writeup, "fig6_trajectories.png"), width = 9.5, height = 6, dpi = 300)
 
 ## Landscapes -------------------------------------------------------------
 LS_fs <- list.files(Dir.Landscapes, pattern = ".txt")
@@ -78,14 +159,6 @@ LS_df <- data.frame(
 #' replicate is the replicate number of the landscape
 LS_df$ID <- with(LS_df, paste(ac, patch_sd, sep = "_")) # add an ID for treatment to simplify later grouping and plotting
 
-## Individual Runs --------------------------------------------------------
-simsteps_df <- read.csv("all_results_v2.csv")
-
-# PLOTTING ================================================================
-## Trajectories -----------------------------------------------------------
-message("cannot plot this yet due to missing data file")
-
-## Landscapes -------------------------------------------------------------
 ## plotting triptychs of landscapes for each combination of ac and patch_sd acrross replicates
 lapply(unique(LS_df$ID), FUN = function(i) {
     sub_df <- LS_df[LS_df$ID == i, ]
@@ -131,6 +204,13 @@ lapply(unique(LS_df$ID), FUN = function(i) {
 })
 
 ## Model Outcomes ---------------------------------------------------------
+invisible(source("analyse_sweep.R"))
+#' registers:
+#' - d: run-level summary of all simulations
+#' - s: run-level summary of simulations where populations persisted
+#' - res: model results
+#' - out: effects table
+
 ### Fig 1: the phase signatures --------
 sem <- function(x) sd(x, na.rm = TRUE) / sqrt(sum(is.finite(x)))
 hs <- s[s$patch_sd > 0, ]
@@ -475,3 +555,66 @@ p5 <- plot_grid(
 p5
 
 ggsave(p5, filename = file.path(Dir.writeup, "fig5_draw_robustness.png"), width = 8.5, height = 4.6, dpi = 300)
+
+
+## Boundary Map -----------------------------------------------------------
+args <- commandArgs(trailingOnly = TRUE)
+d <- read.csv(file.path(Dir.Supplement, if (length(args)) args[1] else "boundary_map.csv"))
+d$alive <- as.numeric(d$final_n > 10)
+
+sds <- sort(unique(d$sd))
+acs <- sort(unique(d$ac))
+M_n <- tapply(d$final_n, list(d$sd, d$ac), median)
+M_a <- tapply(d$alive, list(d$sd, d$ac), mean)
+
+agg <- aggregate(alive ~ sd + ac, data = d, FUN = mean)
+agg$med_n <- aggregate(final_n ~ sd + ac, data = d, FUN = median)$final_n
+agg$n_lab <- ifelse(agg$med_n >= 10, sprintf("%.0f", agg$med_n), sprintf("%.2f", agg$med_n))
+agg$a_lab <- sprintf("%.2f", agg$alive)
+
+tile_w <- min(diff(sds))
+tile_h <- min(diff(acs))
+
+p_n <- ggplot(agg, aes(sd, ac, fill = med_n)) +
+    geom_tile(width = tile_w, height = tile_h, color = "white") +
+    geom_label(aes(label = n_lab, color = med_n > max(agg$med_n) * .55),
+        size = 3, show.legend = FALSE, colour = "black", fill = "white"
+    ) +
+    # scale_color_manual(values = c(`FALSE` = "white", `TRUE` = "grey15"), guide = "none") +
+    scale_fill_viridis_c(name = "n", end = 0.75) +
+    scale_x_continuous(breaks = sds) +
+    scale_y_continuous(breaks = acs) +
+    labs(
+        x = "Landscape Heterogeneity (patch SD)", y = "Spatial Autocorrelation",
+        title = "Equilibrium Abundance (median, t = 800)"
+    ) +
+    mytheme +
+    theme(
+        legend.key.height = unit(0.5, "cm"), legend.key.width = unit(1.5, "cm"),
+        legend.position = "bottom",
+        legend.direction = "horizontal"
+    )
+# p_n
+
+p_a <- ggplot(agg, aes(sd, ac, fill = alive)) +
+    geom_tile(width = tile_w, height = tile_h, color = "white") +
+    geom_label(aes(label = a_lab, color = alive > .55), size = 3, show.legend = FALSE, fill = "white", colour = "black") +
+    # scale_color_manual(values = c(`TRUE` = "white", `FALSE` = "grey15"), guide = "none") +
+    # geom_contour(aes(z = alive), breaks = .5, color = "#cc3333", linewidth = .9) +
+    scale_fill_gradientn(colors = pal, limits = c(0, 1), name = "fraction\npersisting   ") +
+    scale_x_continuous(breaks = sds) +
+    scale_y_continuous(breaks = acs) +
+    labs(
+        x = "landscape heterogeneity (patch SD)", y = "spatial autocorrelation",
+        title = "fraction of populations persisting"
+    ) +
+    mytheme +
+    theme(
+        legend.key.height = unit(0.5, "cm"), legend.key.width = unit(1.5, "cm"),
+        legend.position = "bottom",
+        legend.direction = "horizontal"
+    )
+# p_a
+
+fig <- p_n + p_a
+ggsave(fig, filename = file.path(Dir.Supplement, "figS_boundary_map.png"), width = 9.5, height = 4.6, dpi = 300)
