@@ -103,6 +103,12 @@ void Population::AddIndividual(double x,double y,double u,double id,double patch
     
     }
 
+void Population::RefreshAllOptima(){
+    // v3: the environmental shift reaches living adults, not only new offspring
+    vector<Individual*> all = myPopulation.GetAllIndividuals();
+    for (size_t q=0;q<all.size();q++){ all[q]->renew_environmentalvalue(); all[q]->dirty=true; }
+}
+
 void Population::NextEvent(int iteration){
     
      int i;
@@ -202,7 +208,7 @@ void Population::NextEvent(int iteration){
                   Individual *ind = cur[q];
                   uu.push_back(ind->u);
                   xx.push_back(ind->x);
-                  mal.push_back(fabs(S*ind->x + ind->patch - ind->u));
+                  mal.push_back(fabs(S*ind->x + ind->patch + pertvalue - ind->u));   // v3: includes p(t)
                   double d = nnDist(myPopulation, ind);
                   if(d==d) nnd.push_back(d);
               }

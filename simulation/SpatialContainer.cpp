@@ -98,19 +98,14 @@ vector<Individual*> SpatialContainer::GetNeighborhoodIndividuals(Individual &pas
 
     int lower_value_i = boxi-1;
     int upper_value_i = boxi+1;
-    int lower_value_j = boxj-1;
-    int upper_value_j = boxj+1;
-    
-    // Need to correct for edge effects
+    // x is absorbing: clamp the block. y is periodic (v3): wrap the block.
     if (lower_value_i < 0) lower_value_i=0;
     if (upper_value_i == max_i) upper_value_i = max_i-1;
-    if (lower_value_j < 0) lower_value_j = 0;
-    if (upper_value_j == max_j) upper_value_j = max_j-1;
-    
     
     for (int i=lower_value_i;i<upper_value_i+1;i++){
         
-        for (int j=lower_value_j;j<upper_value_j+1;j++){
+        for (int dj=-1; dj<=1; dj++){
+            int j = ((boxj+dj) % max_j + max_j) % max_j;
             // Create a map iterator and point to beginning of map
             map<int, Individual>::iterator it = myworld[i][j].begin();
             

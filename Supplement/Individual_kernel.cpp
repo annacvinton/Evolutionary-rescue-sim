@@ -99,19 +99,25 @@ double Individual::death(SpatialContainer &myPopulation){
         double difx;
         double dify;
         double difu;
-        const double c_comp  = 1.69;   // competition weight at zero distance (was sds^2 = 1.3^2)
-        const double sigma_c = 1.0;    // Gaussian kernel width (v3: Gaussian replaces exp(-r))
+        double sds = 1.3;
+      //  int sdc = 5;
  
         // Access the object through iterator
         Individual &currentIndividual = **it;
         difx = this->x - currentIndividual.x;
         dify = this->y - currentIndividual.y;
-        // y is periodic with period 99 (offspring y >= 99 wraps to y-99); use the shorter arc
-        if (dify >  49.5) dify -= 99.0;
-        if (dify < -49.5) dify += 99.0;
         difu = this->u - currentIndividual.u;
                 
-        compxyu = c_comp * exp(-0.5*((difx*difx)+(dify*dify))/(sigma_c*sigma_c));
+        // KERNEL=0 (default): exponential exp(-r), the original model.
+        // KERNEL=1: Gaussian exp(-r^2/2), matched to the exponential's spatial
+        //           integral so equilibrium density is comparable (sensitivity check).
+        {
+            double r2 = difx*difx + dify*dify;
+            static int kern = -1;
+            if (kern < 0) { const char* kv = getenv("KERNEL"); kern = kv ? atoi(kv) : 0; }
+            compxyu = (kern == 1) ? sds*sds*exp(-0.5*r2)
+                                  : 1/((exp(sqrt(r2)))/(sds*sds));   // original expression, verbatim
+        }
         
         num1=1;
         //num = number of individuals in neighborhood
@@ -143,8 +149,7 @@ Individual::Individual(){
 //change 2 below
 double MUT_SD = 0.0;   // set from env MUTSD in main
 double DISP_SD = 1.5;  // set from env DISP in main
-default_random_engine de(12345); //seed (reseeded from SEED via seed_dispersal_rng in main)
-void seed_dispersal_rng(unsigned s){ de.seed(s); }
+default_random_engine de(12345); //seed
     normal_distribution<double> nd(0.0, 1.5);//dispersal sd //mean followed by stdiv
  normal_distribution<double> nd0(0.0, 1.5);
  normal_distribution<double> nd1(0.0, 1.5);//mutation sd

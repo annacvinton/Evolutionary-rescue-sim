@@ -46,6 +46,7 @@ public:
     Population();
     
       void NextEvent(int iteration);
+    void RefreshAllOptima();
     
    void AddIndividual(double x,double y,double u, double id,double patch);
     

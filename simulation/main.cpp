@@ -42,13 +42,14 @@ using namespace std;
 //double r, s = 2.0 * sigma * sigma;
  // double sum = 0.0;
 double S=1.2; //set from env SLOPE at start of main
+int ADULTS_SHIFT=0; // set from env; 0 = buffered adults (default), 1 = shift reaches adults
 //SKIP RUN_15
 double C=0; //0,.2,.4,.6,.8,1 curvature
 int CEN=0; //0 if s=/=0 otherise 50
 
 
 double environmentalvalue(double x, double y,double pertvalue,double repvalue,double patch){
-    return CEN + S*x + (1/2)*C*x*x + pertvalue + patch;
+    return CEN + S*x + pertvalue + patch;
    // return 50 + pertvalue;
 }
 
@@ -66,6 +67,8 @@ int main() {
     int TMAX   = envi("TMAX", 150);
     int NFOUND = envi("NFOUND", 700);
     int SEED   = envi("SEED", 54321);
+    ADULTS_SHIFT = envi("ADULTS_SHIFT", 0);
+    seed_dispersal_rng((unsigned)(SEED*7919u + 13u));   // v3: dispersal/mutation stream tied to SEED
     int MAXPERT=17;
  //perreps from 0 to 8, 0,4,and 8.
     for(int pertrep=PERT;pertrep<PERT+1;pertrep+=1){
@@ -90,16 +93,12 @@ int main() {
     for(int i=0; i<iterationbegin; i++) {
    // double  x = rand() % 100 + 1;
     static mt19937 rnd(SEED+7);
-    uniform_real_distribution<> d(0, 98);
-   double  x = d(rnd);
-   double y = d(rnd);
-   double patch = 0;
-//    double patch = theIndividual.patchValue(x,y);    
- //  double u = d(rnd);
-   
-///this is integer but pick new random function that produces double!!
-        //thePopulation.AddIndividual(x,y,u,i);
-        thePopulation.AddIndividual(x,y,CEN+S*x + (1/2)*C*x*x,i,patch); //start perfectly adapted
+    uniform_real_distribution<> dx(0, 99);   // x in [0,99]
+    uniform_real_distribution<> dy(0, 99);   // y in [0,99)
+   double  x = dx(rnd);
+   double y = dy(rnd);
+   double patch = theIndividual.patchValue(x,y);          // v3: founders matched to local optimum
+        thePopulation.AddIndividual(x,y,CEN+S*x + patch,i,patch); //start perfectly adapted, including heterogeneity
     }
     
     srand48(SEED+rep*1000);
@@ -111,7 +110,10 @@ int main() {
             thePopulation.repvalue=rep;
            thePopulation.pertname=pertrep;
         }else{
-            thePopulation.pertvalue=pertrep;
+            if(thePopulation.pertvalue==0){                 // first step past TPERT
+                thePopulation.pertvalue=pertrep;
+                if(ADULTS_SHIFT) thePopulation.RefreshAllOptima();   // ADULTS_SHIFT=1: shift reaches living adults
+            }                                               // default 0: adults keep birth-time optimum (buffered)
             thePopulation.pertname=pertrep;
         };
         thePopulation.iteration = iteration;

@@ -1,0 +1,4 @@
+126 control cells + 1050 sweep cells on 10 cores   started Thu Sep  3 07:43:10 MDT 2026
+complete Mon Sep  7 17:29:37 MDT 2026
+next: rerun ./combine_results_v3.sh and python3 reduce_sweep_v3.py (they include slope 0.6 automatically),
+and re-collect controls: bash -c 'tail -n +1 /dev/null'; see chat for the control re-collect line

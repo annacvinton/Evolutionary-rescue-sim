@@ -92,4 +92,5 @@ public:
 
 };
 
+void seed_dispersal_rng(unsigned s);
 #endif /* Individual_hpp */

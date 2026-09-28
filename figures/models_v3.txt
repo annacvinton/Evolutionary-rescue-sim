@@ -1,0 +1,30 @@
+=== v3 models: balanced core, patchy landscapes, cell-clustered SEs ===
+
+resistance : joint p --  slope 6.9e-07  disp <2e-16  mut <2e-16  AC <2e-16 
+log1p recovery : joint p --  slope <2e-16  disp <2e-16  mut <2e-16  AC 4.3e-05 
+persistence   : joint p --  disp 2.4e-05  AC 0.0019 
+
+eta2 recovery slope : 25.1 %
+eta2 recovery disp : 20.9 %
+eta2 recovery mutsd : 72.7 %
+eta2 recovery ac : 0.6 %
+
+mediation: AC joint p with log(baseline) in model: 0.62 ; log(baseline) coef 0.045 
+
+=== Interaction screen (drop-one from full two-way model) ===
+           interaction resist_eta2 recover_eta2 persist_dR2
+          disp x mutsd         0.5         13.8        0.11
+          slope x disp        19.7         12.5       19.06
+    mutsd x pert_treat         0.2          9.4        0.22
+         slope x mutsd         0.2          3.8        0.00
+            slope x ac         0.7          2.3        0.78
+     disp x pert_treat         7.3          1.7        1.57
+            mutsd x ac         0.0          1.4        0.00
+      slope x patch_sd         1.0          1.3        0.83
+         patch_sd x ac         0.1          1.2        0.61
+    slope x pert_treat         1.7          0.5        0.22
+             disp x ac         0.6          0.5        0.82
+       disp x patch_sd         0.3          0.4        0.07
+      mutsd x patch_sd         0.0          0.3        0.00
+       pert_treat x ac         0.2          0.1        0.19
+ pert_treat x patch_sd         0.1          0.0        0.15
